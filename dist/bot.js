@@ -99,12 +99,19 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
             testnet: TEST_NET,
         });
         // call API to check if there's already an active order of symbol
-        const getActiveOrdersResult = yield contractClient.getActiveOrders({ symbol: symbol, limit: 1 });
-        if (getActiveOrdersResult.retMsg !== "OK" || getActiveOrdersResult.result.list.length > 0)
+        const getActiveOrdersResult = yield contractClient.getActiveOrders({
+            symbol: symbol,
+            limit: 1,
+        });
+        if (getActiveOrdersResult.retMsg !== "OK" ||
+            getActiveOrdersResult.result.list.length > 0)
             return;
         // call API to check if there's already an open position of symbol
-        const getPositionsResult = yield contractClient.getPositions({ symbol: symbol });
-        if (getPositionsResult.retMsg !== "OK" || getPositionsResult.result.list[0].side !== 'None')
+        const getPositionsResult = yield contractClient.getPositions({
+            symbol: symbol,
+        });
+        if (getPositionsResult.retMsg !== "OK" ||
+            getPositionsResult.result.list[0].side !== "None")
             return;
         const oc = config.oc / 100;
         const gap = openPrice * oc * (config.extend / 100);
@@ -114,17 +121,17 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
         const tradeType = config.tradeType;
         if (currentPrice < buyConditionPrice && tradeType !== "short") {
             const limitPrice = openPrice - openPrice * oc;
-            const tpPrice = (limitPrice + (openPrice - limitPrice) * tp);
-            const qty = (config.amount / limitPrice);
+            const tpPrice = limitPrice + (openPrice - limitPrice) * tp;
+            const qty = config.amount / limitPrice;
             // call API to submit limit order of symbol
             const submitOrderResult = yield contractClient.submitOrder({
                 side: "Buy",
                 symbol: symbol,
-                price: limitPrice.toFixed(2),
+                price: limitPrice.toFixed(4),
                 orderType: "Limit",
-                qty: qty.toFixed(2),
+                qty: qty.toFixed(3),
                 timeInForce: "GoodTillCancel",
-                takeProfit: tpPrice.toFixed(2),
+                takeProfit: tpPrice.toFixed(4),
             });
             if (submitOrderResult.retMsg !== "OK") {
                 console.error(`ERROR making long entry order: `, JSON.stringify(submitOrderResult, null, 2));
@@ -132,17 +139,17 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
         }
         if (currentPrice > sellConditionPrice && tradeType !== "long") {
             const limitPrice = openPrice + openPrice * oc;
-            const tpPrice = (limitPrice - (limitPrice - openPrice) * tp);
-            const qty = (config.amount / limitPrice);
+            const tpPrice = limitPrice - (limitPrice - openPrice) * tp;
+            const qty = config.amount / limitPrice;
             // call API to submit limit order of symbol
             const submitOrderResult = yield contractClient.submitOrder({
                 side: "Sell",
                 symbol: symbol,
-                price: limitPrice.toFixed(2),
+                price: limitPrice.toFixed(4),
                 orderType: "Limit",
-                qty: qty.toFixed(2),
+                qty: qty.toFixed(3),
                 timeInForce: "GoodTillCancel",
-                takeProfit: tpPrice.toFixed(2),
+                takeProfit: tpPrice.toFixed(4),
             });
             if (submitOrderResult.retMsg !== "OK") {
                 console.error(`ERROR making sell entry order: `, JSON.stringify(submitOrderResult, null, 2));
@@ -166,7 +173,9 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                 testnet: TEST_NET,
             });
             // call API to get current position of symbol
-            const getPositionsResult = yield contractClient.getPositions({ symbol: symbol });
+            const getPositionsResult = yield contractClient.getPositions({
+                symbol: symbol,
+            });
             if (getPositionsResult.retMsg !== "OK") {
                 console.error(`ERROR get positions: `, JSON.stringify(getPositionsResult, null, 2));
                 return;
@@ -192,7 +201,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
             }
             const setTPSLResult = yield contractClient.setTPSL({
                 symbol: symbol,
-                takeProfit: newTpPrice.toFixed(2),
+                takeProfit: newTpPrice.toFixed(4),
                 positionIdx: 0,
             });
             if (setTPSLResult.retMsg !== "OK") {
@@ -209,7 +218,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
     //   });
     // }
 });
-const bot = () => {
+const bot = () => __awaiter(void 0, void 0, void 0, function* () {
     configWebsocket();
-};
+});
 exports.default = bot;

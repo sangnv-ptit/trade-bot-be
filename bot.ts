@@ -55,22 +55,22 @@ const configWebsocket = async () => {
     ]);
   });
   wsClient.subscribe([`user.execution.contractAccount`]);
-}
+};
 
-const handleUpdate = async (data:any) => {
+const handleUpdate = async (data: any) => {
   if (data.topic.startsWith("tickers.")) {
     const symbol = data.data.symbol;
     const config = await Config.findOne({ symbol: symbol });
     if (!config) {
-      console.log(`no config for symbol: ${symbol}`)
-      return
+      console.log(`no config for symbol: ${symbol}`);
+      return;
     }
-    
-    const currentPrice = data.data.lastPrice
-    if (!currentPrice) return
 
-    const openPrice = symbolOpenPriceMap[symbol]
-    if (!openPrice) return
+    const currentPrice = data.data.lastPrice;
+    if (!currentPrice) return;
+
+    const openPrice = symbolOpenPriceMap[symbol];
+    if (!openPrice) return;
 
     const contractClient = new ContractClient({
       key: API_KEY,
@@ -79,34 +79,47 @@ const handleUpdate = async (data:any) => {
     });
 
     // call API to check if there's already an active order of symbol
-    const getActiveOrdersResult = await contractClient.getActiveOrders({symbol: symbol, limit: 1})
-    if (getActiveOrdersResult.retMsg !== "OK" || getActiveOrdersResult.result.list.length > 0) return;
+    const getActiveOrdersResult = await contractClient.getActiveOrders({
+      symbol: symbol,
+      limit: 1,
+    });
+    if (
+      getActiveOrdersResult.retMsg !== "OK" ||
+      getActiveOrdersResult.result.list.length > 0
+    )
+      return;
 
     // call API to check if there's already an open position of symbol
-    const getPositionsResult = await contractClient.getPositions({ symbol: symbol})
-    if (getPositionsResult.retMsg !== "OK" || getPositionsResult.result.list[0].side !== 'None') return;
+    const getPositionsResult = await contractClient.getPositions({
+      symbol: symbol,
+    });
+    if (
+      getPositionsResult.retMsg !== "OK" ||
+      getPositionsResult.result.list[0].side !== "None"
+    )
+      return;
 
-    const oc = config.oc / 100
-    const gap = openPrice * oc * (config.extend / 100)
+    const oc = config.oc / 100;
+    const gap = openPrice * oc * (config.extend / 100);
     const buyConditionPrice = openPrice - gap;
     const sellConditionPrice = openPrice + gap;
-    const tp = config.tp / 100
-    const tradeType = config.tradeType
+    const tp = config.tp / 100;
+    const tradeType = config.tradeType;
     if (currentPrice < buyConditionPrice && tradeType !== "short") {
       const limitPrice = openPrice - openPrice * oc;
-      const tpPrice = (limitPrice + (openPrice - limitPrice) * tp)
-      const qty = (config.amount / limitPrice);
+      const tpPrice = limitPrice + (openPrice - limitPrice) * tp;
+      const qty = config.amount / limitPrice;
 
       // call API to submit limit order of symbol
       const submitOrderResult = await contractClient.submitOrder({
         side: "Buy",
         symbol: symbol,
-        price: limitPrice.toFixed(2),
+        price: limitPrice.toFixed(4),
         orderType: "Limit",
-        qty: qty.toFixed(2),
+        qty: qty.toFixed(3),
         timeInForce: "GoodTillCancel",
-        takeProfit: tpPrice.toFixed(2),
-      })
+        takeProfit: tpPrice.toFixed(4),
+      });
       if (submitOrderResult.retMsg !== "OK") {
         console.error(
           `ERROR making long entry order: `,
@@ -116,19 +129,19 @@ const handleUpdate = async (data:any) => {
     }
     if (currentPrice > sellConditionPrice && tradeType !== "long") {
       const limitPrice = openPrice + openPrice * oc;
-      const tpPrice = (limitPrice - (limitPrice - openPrice) * tp)
-      const qty = (config.amount / limitPrice);
-      
+      const tpPrice = limitPrice - (limitPrice - openPrice) * tp;
+      const qty = config.amount / limitPrice;
+
       // call API to submit limit order of symbol
       const submitOrderResult = await contractClient.submitOrder({
         side: "Sell",
         symbol: symbol,
-        price: limitPrice.toFixed(2),
+        price: limitPrice.toFixed(4),
         orderType: "Limit",
-        qty: qty.toFixed(2),
+        qty: qty.toFixed(3),
         timeInForce: "GoodTillCancel",
-        takeProfit: tpPrice.toFixed(2),
-      })
+        takeProfit: tpPrice.toFixed(4),
+      });
       if (submitOrderResult.retMsg !== "OK") {
         console.error(
           `ERROR making sell entry order: `,
@@ -136,17 +149,16 @@ const handleUpdate = async (data:any) => {
         );
       }
     }
-    
   } else if (data.topic.startsWith("kline.")) {
     const closedTicker = data.data.find((ticker: any) => ticker.confirm);
     if (closedTicker) {
       const symbol = data.topic.split(".")[2];
       const config = await Config.findOne({ symbol: symbol });
       if (!config) {
-        console.log(`no config for symbol: ${symbol}`)
-        return
+        console.log(`no config for symbol: ${symbol}`);
+        return;
       }
-      const openPrice = closedTicker.close
+      const openPrice = closedTicker.close;
       symbolOpenPriceMap[symbol] = Number.parseFloat(openPrice);
       const contractClient = new ContractClient({
         key: API_KEY,
@@ -155,7 +167,9 @@ const handleUpdate = async (data:any) => {
       });
 
       // call API to get current position of symbol
-      const getPositionsResult = await contractClient.getPositions({ symbol: symbol });
+      const getPositionsResult = await contractClient.getPositions({
+        symbol: symbol,
+      });
       if (getPositionsResult.retMsg !== "OK") {
         console.error(
           `ERROR get positions: `,
@@ -165,36 +179,41 @@ const handleUpdate = async (data:any) => {
       }
 
       // call API cancel all orders of symbol
-      const cancelAllOrdersResult = await contractClient.cancelAllOrders(symbol);
+      const cancelAllOrdersResult = await contractClient.cancelAllOrders(
+        symbol
+      );
       if (cancelAllOrdersResult.retMsg !== "OK") {
         console.error(
           `ERROR cancel orders: `,
           JSON.stringify(cancelAllOrdersResult, null, 2)
         );
-        return
+        return;
       }
 
       const position = getPositionsResult.result.list[0];
       if (position.side === "None") return;
-      const oldTpPrice = Number.parseFloat(position.takeProfit)
-      const diff = Math.abs(oldTpPrice - openPrice)
-      const reduce = config.reduce / 100
-      let newTpPrice = oldTpPrice
+      const oldTpPrice = Number.parseFloat(position.takeProfit);
+      const diff = Math.abs(oldTpPrice - openPrice);
+      const reduce = config.reduce / 100;
+      let newTpPrice = oldTpPrice;
       if (position.side === "Buy") {
-        newTpPrice = oldTpPrice - diff * reduce
+        newTpPrice = oldTpPrice - diff * reduce;
       } else {
         newTpPrice = oldTpPrice + diff * reduce;
       }
       const setTPSLResult = await contractClient.setTPSL({
         symbol: symbol,
-        takeProfit: newTpPrice.toFixed(2),
+        takeProfit: newTpPrice.toFixed(4),
         positionIdx: 0,
-      })
+      });
       if (setTPSLResult.retMsg !== "OK") {
         console.error(
           `ERROR set take profit: `,
           JSON.stringify(setTPSLResult, null, 2),
-          symbol, oldTpPrice, newTpPrice, new Date()
+          symbol,
+          oldTpPrice,
+          newTpPrice,
+          new Date()
         );
         return false;
       }
@@ -207,10 +226,10 @@ const handleUpdate = async (data:any) => {
   //     // telegramBot.sendMessage("1003344491", message);
   //   });
   // }
-}
+};
 
-const bot = () => {
-  configWebsocket()
-}
+const bot = async () => {
+  configWebsocket();
+};
 
 export default bot;
