@@ -72,7 +72,10 @@ const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
             secret: API_SECRET,
             testnet: TEST_NET,
         });
-        yield contractClient.setPositionMode({ mode: 3 });
+        const setPositionModeResult = yield contractClient.setPositionMode({ coin: 'USDT', mode: 3 });
+        if (setPositionModeResult.retMsg !== "OK") {
+            console.error(`ERROR set position mode`, JSON.stringify(setPositionModeResult, null, 2));
+        }
         wsClient.on("update", handleUpdate);
         // wsClient.on("open", (data) => {
         //   console.log("ws connection opened:", data.wsKey);
@@ -119,13 +122,22 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
             const currentPrice = data.data.lastPrice;
             if (!currentPrice)
                 return;
-            const contractClient = new bybit_api_1.ContractClient({
-                key: API_KEY,
-                secret: API_SECRET,
-                testnet: TEST_NET,
-            });
             configs.map((config) => __awaiter(void 0, void 0, void 0, function* () {
-                // call API to check if there's already an active order of symbol
+                const contractClient = new bybit_api_1.ContractClient({
+                    key: API_KEY,
+                    secret: API_SECRET,
+                    testnet: TEST_NET,
+                });
+                // call AP to set TP mode to Partial for the symbol of the config
+                const setTPSLModeResult = yield contractClient.setTPSLMode(symbol, "Partial");
+                // if (setTPSLModeResult.retMsg !== "OK") {
+                //   console.error(
+                //     `ERROR set TP mode symbol: ${symbol}`,
+                //     JSON.stringify(setTPSLModeResult, null, 2)
+                //   );
+                //   return;
+                // }
+                // stop if confif already had an active order
                 if (config.orderId)
                     return;
                 const openPrice = symbolOpenPriceMap[config.interval][symbol];
@@ -141,7 +153,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                     const limitPrice = openPrice - openPrice * oc;
                     const tpPrice = limitPrice + (openPrice - limitPrice) * tp;
                     const qty = config.amount / limitPrice;
-                    // call API to submit limit order of symbol
+                    // call API to submit buy limit order of the config
                     const submitOrderResult = yield contractClient.submitOrder({
                         side: "Buy",
                         symbol: symbol,
@@ -157,14 +169,14 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                     }
                     else {
                         config.orderId = submitOrderResult.result.orderId;
-                        config.save();
+                        yield config.save();
                     }
                 }
                 else if (currentPrice > sellConditionPrice && tradeType !== "long") {
                     const limitPrice = openPrice + openPrice * oc;
                     const tpPrice = limitPrice - (limitPrice - openPrice) * tp;
                     const qty = config.amount / limitPrice;
-                    // call API to submit limit order of symbol
+                    // call API to submit sell limit order of the config
                     const submitOrderResult = yield contractClient.submitOrder({
                         side: "Sell",
                         symbol: symbol,
@@ -180,7 +192,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                     }
                     else {
                         config.orderId = submitOrderResult.result.orderId;
-                        config.save();
+                        yield config.save();
                     }
                 }
             }));
@@ -200,22 +212,6 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
             }
             const openPrice = closedTicker.close;
             symbolOpenPriceMap[interval][symbol] = Number.parseFloat(openPrice);
-            const contractClient = new bybit_api_1.ContractClient({
-                key: API_KEY,
-                secret: API_SECRET,
-                testnet: TEST_NET,
-            });
-            // call API to get current position of symbol
-            // const getPositionsResult = await contractClient.getPositions({
-            //   symbol: symbol,
-            // });
-            // if (getPositionsResult.retMsg !== "OK") {
-            //   console.error(
-            //     `ERROR get positions: `,
-            //     JSON.stringify(getPositionsResult, null, 2)
-            //   );
-            //   return;
-            // }
             // call API cancel all orders of symbol
             // const cancelAllOrdersResult = await contractClient.cancelAllOrders(
             //   symbol
@@ -228,6 +224,13 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
             //   return;
             // }
             configs.map((config) => __awaiter(void 0, void 0, void 0, function* () {
+                const contractClient = new bybit_api_1.ContractClient({
+                    key: API_KEY,
+                    secret: API_SECRET,
+                    testnet: TEST_NET,
+                });
+                if (!config.orderId)
+                    return;
                 // call API to cancel an order by orderId
                 if (!config.tpOrderId) {
                     const cancelOrderResult = yield contractClient.cancelOrder({
@@ -235,15 +238,15 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                         orderId: config.orderId,
                     });
                     if (cancelOrderResult.retMsg !== "OK") {
-                        console.error(`ERROR cancel orders: `, JSON.stringify(cancelOrderResult, null, 2));
+                        console.error(`ERROR cancel order: ${config.orderId}`, JSON.stringify(cancelOrderResult, null, 2));
                         return;
                     }
                 }
                 else {
                     // const longPosition = getPositionsResult.result.list[0];
                     const getActiveOrdersResult = yield contractClient.getActiveOrders({
-                        symbol: symbol,
                         orderId: config.tpOrderId,
+                        symbol: symbol,
                     });
                     if (getActiveOrdersResult.retMsg !== "OK") {
                         console.error(`ERROR get active orders: `, JSON.stringify(getActiveOrdersResult, null, 2));
@@ -274,7 +277,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                             triggerPrice: newTpPrice.toFixed(4),
                         });
                         if (modifyOrderResult.retMsg !== "OK") {
-                            console.error(`ERROR modify take profit: `, JSON.stringify(modifyOrderResult, null, 2), symbol, oldTpPrice, newTpPrice, currentTime);
+                            console.error(`ERROR modify take profit: ${tpOrder.orderId} from ${oldTpPrice.toFixed(4)} to ${newTpPrice.toFixed(4)}`, JSON.stringify(modifyOrderResult, null, 2));
                         }
                     }
                 }
@@ -288,11 +291,11 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
             //   const config = await Config.findOne({ orderId: filledOrder.orderId })
             //   if (!config) return;
             //   config.orderId = ''
-            //   config.save()
+            //   await config.save()
             //   // telegramBot.sendMessage("1003344491", message);
         }
         else if (data.topic === `user.order.contractAccount`) {
-            console.log("🚀 ~ file: bot.ts:319 ~ handleUpdate ~ data:", data.data);
+            // console.log("🚀 ~ file: bot.ts:319 ~ handleUpdate ~ data:", data.data);
             const cancelledOrder = data.data.find((item) => {
                 return item.orderStatus === "Cancelled";
             });
@@ -303,7 +306,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                 if (config) {
                     config.orderId = "";
                     config.tpOrderId = "";
-                    config.save();
+                    yield config.save();
                 }
             }
             const filledOrder = data.data.find((item) => {
@@ -317,7 +320,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                     if (config) {
                         config.orderId = "";
                         config.tpOrderId = "";
-                        config.save();
+                        yield config.save();
                     }
                 }
                 else {
@@ -325,7 +328,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
                     const config = yield Config_1.default.findOne({ orderId: filledOrder.orderId });
                     if (config) {
                         config.tpOrderId = tpOrder.orderId;
-                        config.save();
+                        yield config.save();
                     }
                 }
             }

@@ -1,15 +1,7 @@
 import * as dotenv from "dotenv";
 import TelegramBot from "node-telegram-bot-api";
 import Config from "./models/Config";
-import {
-  API_ERROR_CODE,
-  APIMarket,
-  LinearClient,
-  ContractClient,
-  LinearPositionIdx,
-  WebsocketClient,
-  WS_KEY_MAP,
-} from "bybit-api";
+import { ContractClient, WebsocketClient } from "bybit-api";
 
 dotenv.config();
 // const telegramApiToken =
@@ -49,7 +41,13 @@ const configWebsocket = async () => {
       testnet: TEST_NET,
     });
 
-    await contractClient.setPositionMode({ mode: 3 });
+    const setPositionModeResult = await contractClient.setPositionMode({ coin: 'USDT', mode: 3 });
+    if (setPositionModeResult.retMsg !== "OK") {
+      console.error(
+        `ERROR set position mode`,
+        JSON.stringify(setPositionModeResult, null, 2)
+      );
+    }
 
     wsClient.on("update", handleUpdate);
 
@@ -100,15 +98,29 @@ const handleUpdate = async (data: any) => {
       const currentPrice = data.data.lastPrice;
       if (!currentPrice) return;
 
-      const contractClient = new ContractClient({
-        key: API_KEY,
-        secret: API_SECRET,
-        testnet: TEST_NET,
-      });
-
       configs.map(async (config) => {
-        // call API to check if there's already an active order of symbol
+        const contractClient = new ContractClient({
+          key: API_KEY,
+          secret: API_SECRET,
+          testnet: TEST_NET,
+        });
+
+        // call AP to set TP mode to Partial for the symbol of the config
+        const setTPSLModeResult = await contractClient.setTPSLMode(
+          symbol,
+          "Partial"
+        );
+        // if (setTPSLModeResult.retMsg !== "OK") {
+        //   console.error(
+        //     `ERROR set TP mode symbol: ${symbol}`,
+        //     JSON.stringify(setTPSLModeResult, null, 2)
+        //   );
+        //   return;
+        // }
+
+        // stop if confif already had an active order
         if (config.orderId) return;
+
         const openPrice = symbolOpenPriceMap[config.interval][symbol];
         if (!openPrice) return;
 
@@ -123,7 +135,7 @@ const handleUpdate = async (data: any) => {
           const tpPrice = limitPrice + (openPrice - limitPrice) * tp;
           const qty = config.amount / limitPrice;
 
-          // call API to submit limit order of symbol
+          // call API to submit buy limit order of the config
           const submitOrderResult = await contractClient.submitOrder({
             side: "Buy",
             symbol: symbol,
@@ -142,14 +154,14 @@ const handleUpdate = async (data: any) => {
             );
           } else {
             config.orderId = submitOrderResult.result.orderId;
-            config.save();
+            await config.save();
           }
         } else if (currentPrice > sellConditionPrice && tradeType !== "long") {
           const limitPrice = openPrice + openPrice * oc;
           const tpPrice = limitPrice - (limitPrice - openPrice) * tp;
           const qty = config.amount / limitPrice;
 
-          // call API to submit limit order of symbol
+          // call API to submit sell limit order of the config
           const submitOrderResult = await contractClient.submitOrder({
             side: "Sell",
             symbol: symbol,
@@ -167,7 +179,7 @@ const handleUpdate = async (data: any) => {
             );
           } else {
             config.orderId = submitOrderResult.result.orderId;
-            config.save();
+            await config.save();
           }
         }
       });
@@ -186,23 +198,6 @@ const handleUpdate = async (data: any) => {
       }
       const openPrice = closedTicker.close;
       symbolOpenPriceMap[interval][symbol] = Number.parseFloat(openPrice);
-      const contractClient = new ContractClient({
-        key: API_KEY,
-        secret: API_SECRET,
-        testnet: TEST_NET,
-      });
-
-      // call API to get current position of symbol
-      // const getPositionsResult = await contractClient.getPositions({
-      //   symbol: symbol,
-      // });
-      // if (getPositionsResult.retMsg !== "OK") {
-      //   console.error(
-      //     `ERROR get positions: `,
-      //     JSON.stringify(getPositionsResult, null, 2)
-      //   );
-      //   return;
-      // }
 
       // call API cancel all orders of symbol
       // const cancelAllOrdersResult = await contractClient.cancelAllOrders(
@@ -217,6 +212,12 @@ const handleUpdate = async (data: any) => {
       // }
 
       configs.map(async (config) => {
+        const contractClient = new ContractClient({
+          key: API_KEY,
+          secret: API_SECRET,
+          testnet: TEST_NET,
+        });
+        if (!config.orderId) return;
         // call API to cancel an order by orderId
         if (!config.tpOrderId) {
           const cancelOrderResult = await contractClient.cancelOrder({
@@ -225,7 +226,7 @@ const handleUpdate = async (data: any) => {
           });
           if (cancelOrderResult.retMsg !== "OK") {
             console.error(
-              `ERROR cancel orders: `,
+              `ERROR cancel order: ${config.orderId}`,
               JSON.stringify(cancelOrderResult, null, 2)
             );
             return;
@@ -233,8 +234,8 @@ const handleUpdate = async (data: any) => {
         } else {
           // const longPosition = getPositionsResult.result.list[0];
           const getActiveOrdersResult = await contractClient.getActiveOrders({
-            symbol: symbol,
             orderId: config.tpOrderId,
+            symbol: symbol,
           });
           if (getActiveOrdersResult.retMsg !== "OK") {
             console.error(
@@ -245,10 +246,16 @@ const handleUpdate = async (data: any) => {
           } else {
             const tpOrder = getActiveOrdersResult.result.list[0];
             const currentTime = new Date().getTime();
-            const tpOrderCreatedTime = Number.parseInt(tpOrder.createdTime)
+            const tpOrderCreatedTime = Number.parseInt(tpOrder.createdTime);
             if (currentTime - tpOrderCreatedTime < 120) {
-              console.log("🚀 ~ file: bot.ts:251 ~ configs.map ~ tpOrderCreatedTime:", new Date(tpOrderCreatedTime))
-              console.log("🚀 ~ file: bot.ts:251 ~ configs.map ~ currentTime:", new Date(currentTime))
+              console.log(
+                "🚀 ~ file: bot.ts:251 ~ configs.map ~ tpOrderCreatedTime:",
+                new Date(tpOrderCreatedTime)
+              );
+              console.log(
+                "🚀 ~ file: bot.ts:251 ~ configs.map ~ currentTime:",
+                new Date(currentTime)
+              );
               return;
             }
 
@@ -270,12 +277,10 @@ const handleUpdate = async (data: any) => {
             });
             if (modifyOrderResult.retMsg !== "OK") {
               console.error(
-                `ERROR modify take profit: `,
-                JSON.stringify(modifyOrderResult, null, 2),
-                symbol,
-                oldTpPrice,
-                newTpPrice,
-                currentTime
+                `ERROR modify take profit: ${
+                  tpOrder.orderId
+                } from ${oldTpPrice.toFixed(4)} to ${newTpPrice.toFixed(4)}`,
+                JSON.stringify(modifyOrderResult, null, 2)
               );
             }
           }
@@ -290,10 +295,10 @@ const handleUpdate = async (data: any) => {
       //   const config = await Config.findOne({ orderId: filledOrder.orderId })
       //   if (!config) return;
       //   config.orderId = ''
-      //   config.save()
+      //   await config.save()
       //   // telegramBot.sendMessage("1003344491", message);
     } else if (data.topic === `user.order.contractAccount`) {
-      console.log("🚀 ~ file: bot.ts:319 ~ handleUpdate ~ data:", data.data);
+      // console.log("🚀 ~ file: bot.ts:319 ~ handleUpdate ~ data:", data.data);
 
       const cancelledOrder = data.data.find((item: any) => {
         return item.orderStatus === "Cancelled";
@@ -305,7 +310,7 @@ const handleUpdate = async (data: any) => {
         if (config) {
           config.orderId = "";
           config.tpOrderId = "";
-          config.save();
+          await config.save();
         }
       }
 
@@ -321,7 +326,7 @@ const handleUpdate = async (data: any) => {
           if (config) {
             config.orderId = "";
             config.tpOrderId = "";
-            config.save();
+            await config.save();
           }
         } else {
           const tpOrder = data.data[1];
@@ -329,7 +334,7 @@ const handleUpdate = async (data: any) => {
 
           if (config) {
             config.tpOrderId = tpOrder.orderId;
-            config.save();
+            await config.save();
           }
         }
       }
