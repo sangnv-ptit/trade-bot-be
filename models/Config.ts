@@ -7,7 +7,6 @@ const ConfigSchema = new mongoose.Schema(
       required: true,
       min: 2,
       max: 10,
-      unique: true,
     },
     tradeType: {
       type: String,
@@ -42,6 +41,8 @@ const ConfigSchema = new mongoose.Schema(
       required: true,
     },
     ignore: Number,
+    orderId: String,
+    tpOrderId: String,
   },
   { timestamps: true }
 );

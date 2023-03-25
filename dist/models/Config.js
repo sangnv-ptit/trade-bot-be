@@ -10,7 +10,6 @@ const ConfigSchema = new mongoose_1.default.Schema({
         required: true,
         min: 2,
         max: 10,
-        unique: true,
     },
     tradeType: {
         type: String,
@@ -45,6 +44,8 @@ const ConfigSchema = new mongoose_1.default.Schema({
         required: true,
     },
     ignore: Number,
+    orderId: String,
+    tpOrderId: String,
 }, { timestamps: true });
 const Config = mongoose_1.default.model("Config", ConfigSchema);
 exports.default = Config;
