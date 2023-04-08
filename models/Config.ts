@@ -43,6 +43,14 @@ const ConfigSchema = new mongoose.Schema(
     ignore: Number,
     orderId: String,
     tpOrderId: String,
+    winCount: {
+      type: Number,
+      default: 0,
+    },
+    loseCount: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
