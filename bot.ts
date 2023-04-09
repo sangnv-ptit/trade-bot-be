@@ -75,6 +75,7 @@ const configWebsocket = async () => {
 
     // TODO: query distincy symbols, eg: const configs = await Config.distinct('symbol');
     // const configs = await Config.find();
+    console.log("allConfigs", allConfigs)
     allConfigs.map((config: any) => {
       // TODO: unsubscribe redundant topics
       wsClient.subscribe([

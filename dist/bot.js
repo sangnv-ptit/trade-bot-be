@@ -97,6 +97,7 @@ const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
         });
         // TODO: query distincy symbols, eg: const configs = await Config.distinct('symbol');
         // const configs = await Config.find();
+        console.log("allConfigs", allConfigs);
         allConfigs.map((config) => {
             // TODO: unsubscribe redundant topics
             wsClient.subscribe([
