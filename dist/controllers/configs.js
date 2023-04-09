@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteConfig = exports.createConfig = exports.getConfigs = void 0;
 const Config_1 = __importDefault(require("../models/Config"));
 const bot_1 = __importDefault(require("../bot"));
+const bybit_api_1 = require("bybit-api");
 const getConfigs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const configs = yield Config_1.default.find({});
@@ -41,6 +42,27 @@ const deleteConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     try {
         const { id } = req.params;
         const config = yield Config_1.default.findByIdAndDelete(id);
+        const contractClient = new bybit_api_1.ContractClient({
+            key: process.env.API_KEY,
+            secret: process.env.API_SECRET,
+            testnet: Boolean(process.env.TEST_NET),
+        });
+        if (!config)
+            return;
+        if (config.orderId && !config.tpOrderId) {
+            // call API to cancel an order by orderId
+            const cancelOrderResult = yield contractClient.cancelOrder({
+                symbol: config.symbol,
+                orderId: config.orderId,
+            });
+            if (cancelOrderResult.retMsg !== "OK") {
+                console.error(`ERROR cancel order: ${config.orderId}`, JSON.stringify(cancelOrderResult, null, 2));
+                return;
+            }
+            else {
+                console.log(`SUCCESS cancel order: ${config.orderId}`, JSON.stringify(cancelOrderResult, null, 2));
+            }
+        }
         (0, bot_1.default)();
         res.status(200).json(config);
     }

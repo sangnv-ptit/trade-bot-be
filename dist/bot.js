@@ -36,11 +36,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv = __importStar(require("dotenv"));
+const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api"));
 const Config_1 = __importDefault(require("./models/Config"));
 const bybit_api_1 = require("bybit-api");
 dotenv.config();
-// const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-// const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
+const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+const telegramBot = new node_telegram_bot_api_1.default(telegramApiToken, { polling: true });
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
 const TEST_NET = Boolean(process.env.TEST_NET);
@@ -129,7 +130,7 @@ const handleTickerUpdate = (data) => __awaiter(void 0, void 0, void 0, function*
     const symbol = data.symbol;
     const configs = yield Config_1.default.find({ symbol: symbol });
     if (configs.length == 0) {
-        console.log(`no config for symbok: ${symbol}`);
+        console.log(`no config for symbol: ${symbol}`);
         return;
     }
     // Return if Bybit did not send the lastPrice update
@@ -164,7 +165,7 @@ const handleTickerUpdate = (data) => __awaiter(void 0, void 0, void 0, function*
             return;
         isSumbitting[config.id] = true;
         const oc = config.oc / 100;
-        const gap = openPrice * (oc + (config.extend / 100));
+        const gap = openPrice * oc * (config.extend / 100);
         const buyConditionPrice = openPrice - gap;
         const sellConditionPrice = openPrice + gap;
         const tp = config.tp / 100;
@@ -310,7 +311,7 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
         }
     }
     const filledOrder = data.find((item) => {
-        return (item.orderStatus === "Filled" //|| item.orderStatus === "PartiallyFilled"
+        return (item.orderStatus === "Filled" // || item.orderStatus === "PartiallyFilled"
         );
     });
     if (filledOrder) {
@@ -387,7 +388,7 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
     }
 });
 const notify = (message) => {
-    // telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
+    telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
 };
 const bot = () => __awaiter(void 0, void 0, void 0, function* () {
     configWebsocket();

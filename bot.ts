@@ -4,8 +4,8 @@ import Config from "./models/Config";
 import { ContractClient, WebsocketClient } from "bybit-api";
 
 dotenv.config();
-// const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-// const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
+const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
 
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
@@ -102,7 +102,7 @@ const handleTickerUpdate = async (data: any) => {
   const symbol = data.symbol;
   const configs = await Config.find({ symbol: symbol });
   if (configs.length == 0) {
-    console.log(`no config for symbok: ${symbol}`);
+    console.log(`no config for symbol: ${symbol}`);
     return;
   }
 
@@ -140,7 +140,7 @@ const handleTickerUpdate = async (data: any) => {
 
     isSumbitting[config.id] = true;
     const oc = config.oc / 100;
-    const gap = openPrice * (oc + (config.extend / 100));
+    const gap = openPrice * oc * (config.extend / 100);
     const buyConditionPrice = openPrice - gap;
     const sellConditionPrice = openPrice + gap;
     const tp = config.tp / 100;
@@ -313,7 +313,7 @@ const handleContractAccountUpdate = async (data: any) => {
 
   const filledOrder = data.find((item: any) => {
     return (
-      item.orderStatus === "Filled" //|| item.orderStatus === "PartiallyFilled"
+      item.orderStatus === "Filled"// || item.orderStatus === "PartiallyFilled"
     );
   });
   if (filledOrder) {
@@ -409,7 +409,7 @@ const handleContractAccountUpdate = async (data: any) => {
 };
 
 const notify = (message: string) => {
-  // telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
+  telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
 };
 
 const bot = async () => {
