@@ -7,7 +7,6 @@ dotenv.config()
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
 const TEST_NET = Boolean(process.env.TEST_NET);
-const now = new Date()
 
 
 // get config
@@ -15,25 +14,56 @@ const now = new Date()
 async function main() {
   await mongoose.connect(process.env.MONGO_URL || "")
   const configs = await Config.find({})
+  const now = new Date()
   configs.forEach(async (config) => {
-    if (now.getSeconds() === 0) {
-      // if (config.orderId &&) {
-
-      // }
-    } else {
-      if (config.orderId) return;
-    }
-    const symbol = config.symbol
-    const interval = config.interval
     const contractClient = new ContractClient({
       key: API_KEY,
       secret: API_SECRET,
       testnet: TEST_NET,
     })
 
+    const symbol = config.symbol
+    const orderId = config.orderId
+    // if (now.getSeconds() === 0) {
+      if (config.orderId) {
+        const getHistoricOrdersResult = await contractClient.getHistoricOrders({ symbol: symbol, orderId: orderId, limit: 1 })
+        const order = getHistoricOrdersResult.result.list[0]
+        console.log("🚀 ~ file: trade-bot.ts:31 ~ configs.forEach ~ order:", order)
+        if (order.orderStatus === 'Filled') {
+          // TODO: reduce
+          return;
+        } else if (order.orderStatus === 'Cancelled') {
+          
+        } else {
+          const cancelOrderResult = await contractClient.cancelOrder({
+            symbol: symbol,
+            orderId: config.orderId,
+          });
+          if (cancelOrderResult.retMsg !== "OK") {
+            console.error(
+              `ERROR cancel order: ${config.orderId}`,
+              JSON.stringify(cancelOrderResult, null, 2)
+            );
+            return;
+          } else {
+            console.log(
+              `SUCCESS cancel order: ${config.orderId}`,
+              JSON.stringify(cancelOrderResult, null, 2)
+            );
+            config.orderId = "";
+            await config.save();
+            return;
+          }
+        }
+      }
+    // } else {
+    //   if (orderId) return;
+    // }
+
     const currentTimestamp = now.getTime();
     const twoMinAgo = currentTimestamp - (60 * 2000);
 
+    const interval = config.interval
     const getCandlesResult = await contractClient.getCandles({
       category: "linear",
       symbol: symbol,
@@ -56,6 +86,7 @@ async function main() {
     const oc = config.oc / 100;
     const gap = openPrice * (oc + (config.extend / 100));
     const buyConditionPrice = openPrice - gap;
+    console.log("🚀 ~ file: trade-bot.ts:59 ~ configs.forEach ~ buyConditionPrice:", buyConditionPrice)
     const sellConditionPrice = openPrice + gap;
     const tp = config.tp / 100;
     const tradeType = config.tradeType;

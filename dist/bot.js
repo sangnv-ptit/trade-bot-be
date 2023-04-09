@@ -36,12 +36,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv = __importStar(require("dotenv"));
-const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api"));
 const Config_1 = __importDefault(require("./models/Config"));
 const bybit_api_1 = require("bybit-api");
 dotenv.config();
-const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-const telegramBot = new node_telegram_bot_api_1.default(telegramApiToken, { polling: true });
+// const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+// const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
 const TEST_NET = Boolean(process.env.TEST_NET);
@@ -221,7 +220,6 @@ const handleTickerUpdate = (data) => __awaiter(void 0, void 0, void 0, function*
     }));
 });
 const handleKlineUpdate = (data, topic) => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("kline received");
     const closedTicker = data.find((ticker) => ticker.confirm);
     if (!closedTicker)
         return;
@@ -244,8 +242,8 @@ const handleKlineUpdate = (data, topic) => __awaiter(void 0, void 0, void 0, fun
         });
         if (!config.orderId)
             return;
-        // call API to cancel an order by orderId
         if (!config.tpOrderId) {
+            // call API to cancel an order by orderId
             const cancelOrderResult = yield contractClient.cancelOrder({
                 symbol: symbol,
                 orderId: config.orderId,
@@ -312,7 +310,8 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
         }
     }
     const filledOrder = data.find((item) => {
-        return (item.orderStatus === "Filled" || item.orderStatus === "PartiallyFilled");
+        return (item.orderStatus === "Filled" //|| item.orderStatus === "PartiallyFilled"
+        );
     });
     if (filledOrder) {
         // when take profit order filled, order type can only be market -> no partially filled
@@ -388,8 +387,7 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
     }
 });
 const notify = (message) => {
-    return;
-    telegramBot.sendMessage("-1001885942289", message);
+    // telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
 };
 const bot = () => __awaiter(void 0, void 0, void 0, function* () {
     configWebsocket();

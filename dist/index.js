@@ -10,6 +10,7 @@ const symbols_1 = __importDefault(require("./routes/symbols"));
 const login_1 = __importDefault(require("./routes/login"));
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const bot_1 = __importDefault(require("./bot"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -26,4 +27,4 @@ mongoose_1.default
     app.listen(PORT, () => console.log(`Server Port: ${PORT}`));
 })
     .catch((error) => console.log(`${error} did not connect`));
-// bot();
+(0, bot_1.default)();

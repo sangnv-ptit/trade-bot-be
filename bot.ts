@@ -4,8 +4,8 @@ import Config from "./models/Config";
 import { ContractClient, WebsocketClient } from "bybit-api";
 
 dotenv.config();
-const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
+// const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+// const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
 
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
@@ -206,7 +206,6 @@ const handleTickerUpdate = async (data: any) => {
 };
 
 const handleKlineUpdate = async (data: any, topic: string) => {
-  console.log("kline received")
   const closedTicker = data.find((ticker: any) => ticker.confirm);
   if (!closedTicker) return;
 
@@ -314,7 +313,7 @@ const handleContractAccountUpdate = async (data: any) => {
 
   const filledOrder = data.find((item: any) => {
     return (
-      item.orderStatus === "Filled" || item.orderStatus === "PartiallyFilled"
+      item.orderStatus === "Filled" //|| item.orderStatus === "PartiallyFilled"
     );
   });
   if (filledOrder) {
@@ -410,7 +409,7 @@ const handleContractAccountUpdate = async (data: any) => {
 };
 
 const notify = (message: string) => {
-  telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
+  // telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
 };
 
 const bot = async () => {
