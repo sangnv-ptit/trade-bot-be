@@ -31,17 +31,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv = __importStar(require("dotenv"));
-const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api"));
 const bybit_api_1 = require("bybit-api");
 const config_json_1 = require("./models/config-json");
 dotenv.config();
-const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-const telegramBot = new node_telegram_bot_api_1.default(telegramApiToken, { polling: true });
+// const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+// const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
 const TEST_NET = Boolean(process.env.TEST_NET);
@@ -73,13 +69,16 @@ const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
             market: "contractUSDT",
             testnet: TEST_NET,
         });
-        const setPositionModeResult = yield contractClient.setPositionMode({
-            coin: "USDT",
-            mode: 3,
-        });
-        if (setPositionModeResult.retCode !== 0) {
-            console.error(`ERROR set position mode`, JSON.stringify(setPositionModeResult, null, 2));
-        }
+        // const setPositionModeResult = await contractClient.setPositionMode({
+        //   coin: "USDT",
+        //   mode: 3,
+        // });
+        // if (setPositionModeResult.retCode !== 0) {
+        //   console.error(
+        //     `ERROR set position mode`,
+        //     JSON.stringify(setPositionModeResult, null, 2)
+        //   );
+        // }
         wsClient.on("update", handleUpdate);
         // wsClient.on("open", (data) => {
         //   console.log("ws connection opened:", data.wsKey);
@@ -146,7 +145,7 @@ const handleTickerUpdate = (data) => __awaiter(void 0, void 0, void 0, function*
     //   recv_window: 60000,
     // });
     // Call API to set TP mode to Partial for the symbol of the config
-    const setTPSLModeResult = yield contractClient.setTPSLMode(symbol, "Full"); // TODO: remove, default by Bybit
+    // const setTPSLModeResult = await contractClient.setTPSLMode(symbol, "Full"); // TODO: remove, default by Bybit
     // if (setTPSLModeResult.retMsg !== "OK") {
     //   console.error(
     //     `ERROR set TP mode symbol: ${symbol}`,
@@ -425,7 +424,7 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
                     positionIdx: filledOrder.positionIdx,
                 });
                 if (submitOrderResult.retMsg !== "OK") {
-                    console.error(`ERROR making take profit order: `, JSON.stringify(submitOrderResult, null, 2));
+                    console.error(`ERROR making take profit order: `, JSON.stringify(submitOrderResult, null, 2), tpPrice);
                 }
                 else {
                     console.log(`SUCCESS making take profit order: `, JSON.stringify(submitOrderResult, null, 2));
@@ -486,7 +485,7 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
     }
 });
 const notify = (message) => {
-    telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
+    // telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
 };
 const bot = () => __awaiter(void 0, void 0, void 0, function* () {
     configWebsocket();

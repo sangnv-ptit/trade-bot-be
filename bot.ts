@@ -5,8 +5,8 @@ import { ContractClient, WebsocketClient } from "bybit-api";
 import { readConfigs, writeConfigs } from "./models/config-json";
 
 dotenv.config();
-const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
+// const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+// const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
 
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
@@ -44,16 +44,16 @@ const configWebsocket = async () => {
       testnet: TEST_NET,
     });
 
-    const setPositionModeResult = await contractClient.setPositionMode({
-      coin: "USDT",
-      mode: 3,
-    });
-    if (setPositionModeResult.retCode !== 0) {
-      console.error(
-        `ERROR set position mode`,
-        JSON.stringify(setPositionModeResult, null, 2)
-      );
-    }
+    // const setPositionModeResult = await contractClient.setPositionMode({
+    //   coin: "USDT",
+    //   mode: 3,
+    // });
+    // if (setPositionModeResult.retCode !== 0) {
+    //   console.error(
+    //     `ERROR set position mode`,
+    //     JSON.stringify(setPositionModeResult, null, 2)
+    //   );
+    // }
 
     wsClient.on("update", handleUpdate);
 
@@ -123,7 +123,7 @@ const handleTickerUpdate = async (data: any) => {
   // });
 
   // Call API to set TP mode to Partial for the symbol of the config
-  const setTPSLModeResult = await contractClient.setTPSLMode(symbol, "Full"); // TODO: remove, default by Bybit
+  // const setTPSLModeResult = await contractClient.setTPSLMode(symbol, "Full"); // TODO: remove, default by Bybit
   // if (setTPSLModeResult.retMsg !== "OK") {
   //   console.error(
   //     `ERROR set TP mode symbol: ${symbol}`,
@@ -451,7 +451,8 @@ const handleContractAccountUpdate = async (data: any) => {
         if (submitOrderResult.retMsg !== "OK") {
           console.error(
             `ERROR making take profit order: `,
-            JSON.stringify(submitOrderResult, null, 2)
+            JSON.stringify(submitOrderResult, null, 2),
+            tpPrice
           );
         } else {
           console.log(
@@ -531,7 +532,7 @@ const handleContractAccountUpdate = async (data: any) => {
 };
 
 const notify = (message: string) => {
-  telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
+  // telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
 };
 
 const bot = async () => {
