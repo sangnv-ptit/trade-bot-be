@@ -46,7 +46,7 @@ const contractClient = new bybit_api_1.ContractClient({
     secret: API_SECRET,
     testnet: TEST_NET,
 });
-const allConfigs = (0, config_json_1.readConfigs)();
+let allConfigs = (0, config_json_1.readConfigs)();
 let symbolOpenPriceMap = {
     "1": {},
     "3": {},
@@ -63,6 +63,7 @@ let symbolOpenPriceMap = {
 let isSumbitting = {};
 const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        allConfigs = (0, config_json_1.readConfigs)();
         const wsClient = new bybit_api_1.WebsocketClient({
             key: API_KEY,
             secret: API_SECRET,
@@ -97,7 +98,6 @@ const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
         });
         // TODO: query distincy symbols, eg: const configs = await Config.distinct('symbol');
         // const configs = await Config.find();
-        console.log("allConfigs", allConfigs);
         allConfigs.map((config) => {
             // TODO: unsubscribe redundant topics
             wsClient.subscribe([

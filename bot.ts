@@ -18,7 +18,7 @@ const contractClient = new ContractClient({
   testnet: TEST_NET,
 });
 
-const allConfigs = readConfigs()
+let allConfigs = readConfigs()
 
 let symbolOpenPriceMap: any = {
   "1": {},
@@ -37,6 +37,7 @@ let isSumbitting: any = {};
 
 const configWebsocket = async () => {
   try {
+    allConfigs = readConfigs()
     const wsClient = new WebsocketClient({
       key: API_KEY,
       secret: API_SECRET,
@@ -75,7 +76,6 @@ const configWebsocket = async () => {
 
     // TODO: query distincy symbols, eg: const configs = await Config.distinct('symbol');
     // const configs = await Config.find();
-    console.log("allConfigs", allConfigs)
     allConfigs.map((config: any) => {
       // TODO: unsubscribe redundant topics
       wsClient.subscribe([
