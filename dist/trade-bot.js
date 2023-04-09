@@ -41,7 +41,6 @@ function main() {
                 const order = getHistoricOrdersResult.result.list[0];
                 console.log("🚀 ~ file: trade-bot.ts:31 ~ configs.forEach ~ order:", order);
                 if (order.orderStatus === 'Filled') {
-                    // TODO: reduce
                     return;
                 }
                 else if (order.orderStatus === 'Cancelled') {

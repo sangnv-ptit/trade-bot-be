@@ -13,12 +13,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteConfig = exports.createConfig = exports.getConfigs = void 0;
-const Config_1 = __importDefault(require("../models/Config"));
 const bot_1 = __importDefault(require("../bot"));
 const bybit_api_1 = require("bybit-api");
+const config_json_1 = require("../models/config-json");
 const getConfigs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const configs = yield Config_1.default.find({});
+        // const configs = await Config.find({});
+        const configs = (0, config_json_1.readConfigs)();
         res.status(200).json(configs);
     }
     catch (error) {
@@ -28,8 +29,14 @@ const getConfigs = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 exports.getConfigs = getConfigs;
 const createConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let config = new Config_1.default(req.body);
-        yield config.save();
+        // const config = new Config(req.body);
+        // await config.save();
+        // bot();
+        const configs = (0, config_json_1.readConfigs)();
+        const config = Object.assign(Object.assign({}, req.body), { _id: Date.now() });
+        const newConfigs = [...configs, config];
+        console.log("🚀 ~ file: configs.ts:24 ~ createConfig ~ config:", config);
+        (0, config_json_1.writeConfigs)(newConfigs);
         (0, bot_1.default)();
         res.status(200).json(config);
     }
@@ -41,30 +48,39 @@ exports.createConfig = createConfig;
 const deleteConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const config = yield Config_1.default.findByIdAndDelete(id);
-        const contractClient = new bybit_api_1.ContractClient({
-            key: process.env.API_KEY,
-            secret: process.env.API_SECRET,
-            testnet: Boolean(process.env.TEST_NET),
-        });
-        if (!config)
+        // const config = await Config.findByIdAndDelete(id);
+        const configs = (0, config_json_1.readConfigs)();
+        const indexToDelete = configs.findIndex(config => config._id === id);
+        const deletedConfig = configs.splice(indexToDelete, 1)[0];
+        if (!deletedConfig)
             return;
-        if (config.orderId && !config.tpOrderId) {
+        if (deletedConfig.orderId && !deletedConfig.tpOrderId) {
             // call API to cancel an order by orderId
-            const cancelOrderResult = yield contractClient.cancelOrder({
-                symbol: config.symbol,
-                orderId: config.orderId,
+            const contractClient = new bybit_api_1.ContractClient({
+                key: process.env.API_KEY,
+                secret: process.env.API_SECRET,
+                testnet: Boolean(process.env.TEST_NET),
             });
-            if (cancelOrderResult.retMsg !== "OK") {
-                console.error(`ERROR cancel order: ${config.orderId}`, JSON.stringify(cancelOrderResult, null, 2));
-                return;
-            }
-            else {
-                console.log(`SUCCESS cancel order: ${config.orderId}`, JSON.stringify(cancelOrderResult, null, 2));
-            }
+            const cancelOrderResult = yield contractClient.cancelOrder({
+                symbol: deletedConfig.symbol,
+                orderId: deletedConfig.orderId,
+            });
+            // if (cancelOrderResult.retMsg !== "OK") {
+            //   console.error(
+            //     `ERROR cancel order: ${deleteConfig.orderId}`,
+            //     JSON.stringify(cancelOrderResult, null, 2)
+            //   );
+            //   return;
+            // } else {
+            //   console.log(
+            //     `SUCCESS cancel order: ${config.orderId}`,
+            //     JSON.stringify(cancelOrderResult, null, 2)
+            //   );
+            // }
         }
+        (0, config_json_1.writeConfigs)(configs);
         (0, bot_1.default)();
-        res.status(200).json(config);
+        res.status(200).json(deletedConfig);
     }
     catch (error) {
         res.status(400).json({ message: error.message });
