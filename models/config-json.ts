@@ -1,4 +1,6 @@
-import * as fs from 'fs';
+import fs from 'fs';
+
+const filePath = 'db.json';
 
 interface Config {
   _id: string,
@@ -22,20 +24,20 @@ interface Config {
 
 export const readConfigs = (): Config[] => {
   try {
-    const rawData = fs.readFileSync('db.json');
+    const rawData = fs.readFileSync(filePath);
     const configs: Config[] = JSON.parse(rawData.toString());
     return configs;
   }
   catch (error) {
-    console.log("Error while reading json db");
+    console.log("Error while reading json db", error);
     return [];
   }
 };
 
 export const writeConfigs = (configs: Config[]) => {
   try {
-    const jsonData = JSON.stringify(configs);
-    fs.writeFileSync('db.json', jsonData)
+    const jsonData = JSON.stringify(configs, null, 2);
+    fs.writeFileSync(filePath, jsonData)
   }
   catch (error) {
     console.log("Error white writing json db")
@@ -44,6 +46,6 @@ export const writeConfigs = (configs: Config[]) => {
 
 // export const updateConfigOrderId = (orderId: string) => {
 //   try {
-    
+
 //   }
 // }

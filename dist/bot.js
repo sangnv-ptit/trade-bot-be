@@ -31,13 +31,18 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv = __importStar(require("dotenv"));
+const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api"));
 const bybit_api_1 = require("bybit-api");
 const config_json_1 = require("./models/config-json");
+const helpers_1 = require("./helpers");
 dotenv.config();
-// const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-// const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
+const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+const telegramBot = new node_telegram_bot_api_1.default(telegramApiToken, { polling: true });
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
 const TEST_NET = Boolean(process.env.TEST_NET);
@@ -47,7 +52,7 @@ const contractClient = new bybit_api_1.ContractClient({
     testnet: TEST_NET,
 });
 let allConfigs = (0, config_json_1.readConfigs)();
-let symbolOpenPriceMap = {
+const symbolOpenPriceMap = {
     "1": {},
     "3": {},
     "5": {},
@@ -60,7 +65,7 @@ let symbolOpenPriceMap = {
     "720": {},
     D: {},
 };
-let isSumbitting = {};
+const isSumbitting = {};
 const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         allConfigs = (0, config_json_1.readConfigs)();
@@ -113,6 +118,7 @@ const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
 });
 const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        // allConfigs = readConfigs()
         if (data.topic.startsWith("tickers.")) {
             handleTickerUpdate(data.data);
         }
@@ -122,6 +128,7 @@ const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
         else if (data.topic === `user.order.contractAccount`) {
             handleContractAccountUpdate(data.data);
         }
+        // writeConfigs(allConfigs);
     }
     catch (error) {
         console.error(`Unexpected error: `, error);
@@ -179,12 +186,11 @@ const handleTickerUpdate = (data) => __awaiter(void 0, void 0, void 0, function*
             // call API to submit buy limit order of the config
             const submitOrderResult = yield contractClient.submitOrder({
                 side: "Buy",
-                symbol: symbol,
-                price: limitPrice.toFixed(4),
+                symbol,
+                price: (0, helpers_1.formatNumber)(limitPrice),
                 orderType: "Limit",
-                qty: qty.toFixed(3),
+                qty: (0, helpers_1.formatNumber)(qty),
                 timeInForce: "GoodTillCancel",
-                // takeProfit: tpPrice.toFixed(4),
                 positionIdx: "1",
             });
             if (submitOrderResult.retMsg !== "OK") {
@@ -204,12 +210,11 @@ const handleTickerUpdate = (data) => __awaiter(void 0, void 0, void 0, function*
             // call API to submit sell limit order of the config
             const submitOrderResult = yield contractClient.submitOrder({
                 side: "Sell",
-                symbol: symbol,
-                price: limitPrice.toFixed(4),
+                symbol,
+                price: (0, helpers_1.formatNumber)(limitPrice),
                 orderType: "Limit",
-                qty: qty.toFixed(3),
+                qty: (0, helpers_1.formatNumber)(qty),
                 timeInForce: "GoodTillCancel",
-                // takeProfit: tpPrice.toFixed(4),
                 positionIdx: "2",
             });
             if (submitOrderResult.retMsg !== "OK") {
@@ -251,7 +256,7 @@ const handleKlineUpdate = (data, topic) => __awaiter(void 0, void 0, void 0, fun
         if (!config.tpOrderId) {
             // call API to cancel an order by orderId
             const cancelOrderResult = yield contractClient.cancelOrder({
-                symbol: symbol,
+                symbol,
                 orderId: config.orderId,
             });
             if (cancelOrderResult.retMsg !== "OK") {
@@ -265,7 +270,7 @@ const handleKlineUpdate = (data, topic) => __awaiter(void 0, void 0, void 0, fun
         else {
             const getActiveOrdersResult = yield contractClient.getActiveOrders({
                 orderId: config.tpOrderId,
-                symbol: symbol,
+                symbol,
             });
             if (getActiveOrdersResult.retMsg !== "OK") {
                 console.error(`ERROR get active orders: `, JSON.stringify(getActiveOrdersResult, null, 2));
@@ -289,14 +294,13 @@ const handleKlineUpdate = (data, topic) => __awaiter(void 0, void 0, void 0, fun
                 else {
                     newTpPrice = oldTpPrice + diff * reduce;
                 }
-                let modifyOrderResult = yield contractClient.modifyOrder({
-                    symbol: symbol,
+                const modifyOrderResult = yield contractClient.modifyOrder({
+                    symbol,
                     orderId: tpOrder.orderId,
-                    price: newTpPrice.toFixed(4),
-                    // triggerPrice: newTpPrice.toFixed(4),
+                    price: (0, helpers_1.formatNumber)(newTpPrice),
                 });
                 if (modifyOrderResult.retMsg !== "OK") {
-                    console.error(`ERROR modify take profit: ${tpOrder.orderId} from ${oldTpPrice.toFixed(4)} to ${newTpPrice.toFixed(4)}`, JSON.stringify(modifyOrderResult, null, 2));
+                    console.error(`ERROR modify take profit: ${tpOrder.orderId} from ${(0, helpers_1.formatNumber)(oldTpPrice)} to ${(0, helpers_1.formatNumber)(newTpPrice)}, before rounding ${newTpPrice}`, JSON.stringify(modifyOrderResult, null, 2));
                 }
             }
         }
@@ -368,7 +372,7 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
                   ${config.winCount} WINS, ${config.loseCount} LOSES
                   Buy price: ${orderType === "Long" ? entryPrice : exitPrice}, amount: ${orderType === "Long" ? entryAmount : exitAmount}
                   Sell price: ${orderType === "Short" ? entryPrice : exitPrice}, amount: ${orderType === "Long" ? entryAmount : exitAmount}
-                  PNL: $${pnl} ~ ${pnlPercentage.toFixed(4)}%
+                  PNL: $${pnl} ~ ${(0, helpers_1.formatNumber)(pnlPercentage)}%
                 `;
                     notify(newMessage);
                 }), 5000);
@@ -397,7 +401,6 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
             //   await config.save();
             // }
             let config = allConfigs.find(config => config.orderId === filledOrder.orderId);
-            console.log("🚀 ~ file: bot.ts:419 ~ handleContractAccountUpdate ~ filledOrder:", filledOrder);
             if (config) {
                 const side = filledOrder.side === "Buy" ? "OpenLong" : "OpenShort";
                 const message = `
@@ -417,8 +420,8 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
                 // call API to submit buy limit order of the config
                 const submitOrderResult = yield contractClient.submitOrder({
                     side: tpOrderSide,
-                    symbol: symbol,
-                    price: tpPrice.toFixed(4),
+                    symbol,
+                    price: (0, helpers_1.formatNumber)(tpPrice),
                     orderType: "Limit",
                     qty: filledOrder.qty,
                     timeInForce: "GoodTillCancel",
@@ -473,7 +476,7 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
                   ${config.winCount} WINS, ${config.loseCount} LOSES
                   Buy price: ${orderType === "Long" ? entryPrice : exitPrice}, amount: ${orderType === "Long" ? entryAmount : exitAmount}
                   Sell price: ${orderType === "Short" ? entryPrice : exitPrice}, amount: ${orderType === "Long" ? entryAmount : exitAmount}
-                  PNL: $${pnl} ~ ${pnlPercentage.toFixed(4)}%
+                  PNL: $${pnl} ~ ${(0, helpers_1.formatNumber)(pnlPercentage)}%
                 `;
                     notify(newMessage);
                 }), 5000, config);
@@ -486,7 +489,7 @@ const handleContractAccountUpdate = (data) => __awaiter(void 0, void 0, void 0, 
     }
 });
 const notify = (message) => {
-    // telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
+    telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
 };
 const bot = () => __awaiter(void 0, void 0, void 0, function* () {
     configWebsocket();

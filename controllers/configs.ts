@@ -19,7 +19,7 @@ export const createConfig = async (req: any, res: any) => {
     // await config.save();
     // bot();
     const configs = readConfigs()
-    const config = {...req.body, _id: Date.now()}
+    const config = {...req.body, _id: Date.now().toString()}
     const newConfigs = [...configs, config]
     console.log("🚀 ~ file: configs.ts:24 ~ createConfig ~ config:", config)
     writeConfigs(newConfigs)
@@ -36,7 +36,12 @@ export const deleteConfig = async (req: any, res: any) => {
     // const config = await Config.findByIdAndDelete(id);
     const configs = readConfigs();
     const indexToDelete = configs.findIndex(config => config._id === id)
+    if (indexToDelete === -1) {
+      console.log(`failed to delete ${id}`)
+      return;
+    }
     const deletedConfig = configs.splice(indexToDelete, 1)[0]
+    console.log("🚀 ~ file: configs.ts:40 ~ deleteConfig ~ configs:", configs)
 
     if (!deletedConfig) return;
     if (deletedConfig.orderId && !deletedConfig.tpOrderId) {
@@ -50,18 +55,19 @@ export const deleteConfig = async (req: any, res: any) => {
         symbol: deletedConfig.symbol,
         orderId: deletedConfig.orderId,
       });
-      // if (cancelOrderResult.retMsg !== "OK") {
-      //   console.error(
-      //     `ERROR cancel order: ${deleteConfig.orderId}`,
-      //     JSON.stringify(cancelOrderResult, null, 2)
-      //   );
-      //   return;
-      // } else {
-      //   console.log(
-      //     `SUCCESS cancel order: ${config.orderId}`,
-      //     JSON.stringify(cancelOrderResult, null, 2)
-      //   );
-      // }
+      if (cancelOrderResult.retMsg !== "OK") {
+        console.error(
+          `delete config`,
+          `ERROR cancel order: ${deletedConfig.orderId}`,
+          JSON.stringify(cancelOrderResult, null, 2)
+        );
+      } else {
+        console.log(
+          `delete config`,
+          `SUCCESS cancel order: ${deletedConfig.orderId}`,
+          JSON.stringify(cancelOrderResult, null, 2)
+        );
+      }
     }
     writeConfigs(configs)
     bot();

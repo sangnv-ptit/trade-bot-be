@@ -33,7 +33,7 @@ const createConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         // await config.save();
         // bot();
         const configs = (0, config_json_1.readConfigs)();
-        const config = Object.assign(Object.assign({}, req.body), { _id: Date.now() });
+        const config = Object.assign(Object.assign({}, req.body), { _id: Date.now().toString() });
         const newConfigs = [...configs, config];
         console.log("🚀 ~ file: configs.ts:24 ~ createConfig ~ config:", config);
         (0, config_json_1.writeConfigs)(newConfigs);
@@ -51,7 +51,12 @@ const deleteConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         // const config = await Config.findByIdAndDelete(id);
         const configs = (0, config_json_1.readConfigs)();
         const indexToDelete = configs.findIndex(config => config._id === id);
+        if (indexToDelete === -1) {
+            console.log(`failed to delete ${id}`);
+            return;
+        }
         const deletedConfig = configs.splice(indexToDelete, 1)[0];
+        console.log("🚀 ~ file: configs.ts:40 ~ deleteConfig ~ configs:", configs);
         if (!deletedConfig)
             return;
         if (deletedConfig.orderId && !deletedConfig.tpOrderId) {
@@ -65,18 +70,12 @@ const deleteConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 symbol: deletedConfig.symbol,
                 orderId: deletedConfig.orderId,
             });
-            // if (cancelOrderResult.retMsg !== "OK") {
-            //   console.error(
-            //     `ERROR cancel order: ${deleteConfig.orderId}`,
-            //     JSON.stringify(cancelOrderResult, null, 2)
-            //   );
-            //   return;
-            // } else {
-            //   console.log(
-            //     `SUCCESS cancel order: ${config.orderId}`,
-            //     JSON.stringify(cancelOrderResult, null, 2)
-            //   );
-            // }
+            if (cancelOrderResult.retMsg !== "OK") {
+                console.error(`delete config`, `ERROR cancel order: ${deletedConfig.orderId}`, JSON.stringify(cancelOrderResult, null, 2));
+            }
+            else {
+                console.log(`delete config`, `SUCCESS cancel order: ${deletedConfig.orderId}`, JSON.stringify(cancelOrderResult, null, 2));
+            }
         }
         (0, config_json_1.writeConfigs)(configs);
         (0, bot_1.default)();

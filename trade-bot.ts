@@ -26,16 +26,16 @@ async function main() {
     const orderId = config.orderId
     // if (now.getSeconds() === 0) {
       if (config.orderId) {
-        const getHistoricOrdersResult = await contractClient.getHistoricOrders({ symbol: symbol, orderId: orderId, limit: 1 })
+        const getHistoricOrdersResult = await contractClient.getHistoricOrders({ symbol, orderId, limit: 1 })
         const order = getHistoricOrdersResult.result.list[0]
         console.log("🚀 ~ file: trade-bot.ts:31 ~ configs.forEach ~ order:", order)
         if (order.orderStatus === 'Filled') {
           return;
         } else if (order.orderStatus === 'Cancelled') {
-          
+
         } else {
           const cancelOrderResult = await contractClient.cancelOrder({
-            symbol: symbol,
+            symbol,
             orderId: config.orderId,
           });
           if (cancelOrderResult.retMsg !== "OK") {
@@ -65,15 +65,15 @@ async function main() {
     const interval = config.interval
     const getCandlesResult = await contractClient.getCandles({
       category: "linear",
-      symbol: symbol,
-      interval: interval,
+      symbol,
+      interval,
       start: twoMinAgo,
       end: currentTimestamp,
       limit: 1,
     })
     const openPrice = parseFloat(getCandlesResult.result.list[0][1])
     console.log("🚀 ~ file: trade-bot.ts:37 ~ configs.map ~ openPrice:", openPrice)
-    
+
     // get last price
     const getSymbolTickerResult = await contractClient.getSymbolTicker(
       "linear",
@@ -97,7 +97,7 @@ async function main() {
       // call API to submit buy limit order of the config
       const submitOrderResult = await contractClient.submitOrder({
         side: "Buy",
-        symbol: symbol,
+        symbol,
         price: limitPrice.toFixed(4),
         orderType: "Limit",
         qty: qty.toFixed(3),
@@ -127,7 +127,7 @@ async function main() {
       // call API to submit sell limit order of the config
       const submitOrderResult = await contractClient.submitOrder({
         side: "Sell",
-        symbol: symbol,
+        symbol,
         price: limitPrice.toFixed(4),
         orderType: "Limit",
         qty: qty.toFixed(3),

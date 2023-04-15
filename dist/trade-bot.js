@@ -37,7 +37,7 @@ function main() {
             const orderId = config.orderId;
             // if (now.getSeconds() === 0) {
             if (config.orderId) {
-                const getHistoricOrdersResult = yield contractClient.getHistoricOrders({ symbol: symbol, orderId: orderId, limit: 1 });
+                const getHistoricOrdersResult = yield contractClient.getHistoricOrders({ symbol, orderId, limit: 1 });
                 const order = getHistoricOrdersResult.result.list[0];
                 console.log("🚀 ~ file: trade-bot.ts:31 ~ configs.forEach ~ order:", order);
                 if (order.orderStatus === 'Filled') {
@@ -47,7 +47,7 @@ function main() {
                 }
                 else {
                     const cancelOrderResult = yield contractClient.cancelOrder({
-                        symbol: symbol,
+                        symbol,
                         orderId: config.orderId,
                     });
                     if (cancelOrderResult.retMsg !== "OK") {
@@ -70,8 +70,8 @@ function main() {
             const interval = config.interval;
             const getCandlesResult = yield contractClient.getCandles({
                 category: "linear",
-                symbol: symbol,
-                interval: interval,
+                symbol,
+                interval,
                 start: twoMinAgo,
                 end: currentTimestamp,
                 limit: 1,
@@ -96,7 +96,7 @@ function main() {
                 // call API to submit buy limit order of the config
                 const submitOrderResult = yield contractClient.submitOrder({
                     side: "Buy",
-                    symbol: symbol,
+                    symbol,
                     price: limitPrice.toFixed(4),
                     orderType: "Limit",
                     qty: qty.toFixed(3),
@@ -120,7 +120,7 @@ function main() {
                 // call API to submit sell limit order of the config
                 const submitOrderResult = yield contractClient.submitOrder({
                     side: "Sell",
-                    symbol: symbol,
+                    symbol,
                     price: limitPrice.toFixed(4),
                     orderType: "Limit",
                     qty: qty.toFixed(3),

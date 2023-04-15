@@ -3,10 +3,11 @@ import TelegramBot from "node-telegram-bot-api";
 import Config from "./models/Config";
 import { ContractClient, WebsocketClient } from "bybit-api";
 import { readConfigs, writeConfigs } from "./models/config-json";
+import { formatNumber } from "./helpers";
 
 dotenv.config();
-// const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-// const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
+const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
 
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
@@ -20,7 +21,7 @@ const contractClient = new ContractClient({
 
 let allConfigs = readConfigs()
 
-let symbolOpenPriceMap: any = {
+const symbolOpenPriceMap: any = {
   "1": {},
   "3": {},
   "5": {},
@@ -33,7 +34,7 @@ let symbolOpenPriceMap: any = {
   "720": {},
   D: {},
 };
-let isSumbitting: any = {};
+const isSumbitting: any = {};
 
 const configWebsocket = async () => {
   try {
@@ -91,6 +92,7 @@ const configWebsocket = async () => {
 
 const handleUpdate = async (data: any) => {
   try {
+    // allConfigs = readConfigs()
     if (data.topic.startsWith("tickers.")) {
       handleTickerUpdate(data.data);
     } else if (data.topic.startsWith("kline.")) {
@@ -98,6 +100,7 @@ const handleUpdate = async (data: any) => {
     } else if (data.topic === `user.order.contractAccount`) {
       handleContractAccountUpdate(data.data);
     }
+    // writeConfigs(allConfigs);
   } catch (error) {
     console.error(`Unexpected error: `, error);
   }
@@ -159,12 +162,11 @@ const handleTickerUpdate = async (data: any) => {
       // call API to submit buy limit order of the config
       const submitOrderResult = await contractClient.submitOrder({
         side: "Buy",
-        symbol: symbol,
-        price: limitPrice.toFixed(4),
+        symbol,
+        price: formatNumber(limitPrice),
         orderType: "Limit",
-        qty: qty.toFixed(3),
+        qty: formatNumber(qty),
         timeInForce: "GoodTillCancel",
-        // takeProfit: tpPrice.toFixed(4),
         positionIdx: "1",
       });
 
@@ -190,12 +192,11 @@ const handleTickerUpdate = async (data: any) => {
       // call API to submit sell limit order of the config
       const submitOrderResult = await contractClient.submitOrder({
         side: "Sell",
-        symbol: symbol,
-        price: limitPrice.toFixed(4),
+        symbol,
+        price: formatNumber(limitPrice),
         orderType: "Limit",
-        qty: qty.toFixed(3),
+        qty: formatNumber(qty),
         timeInForce: "GoodTillCancel",
-        // takeProfit: tpPrice.toFixed(4),
         positionIdx: "2",
       });
       if (submitOrderResult.retMsg !== "OK") {
@@ -240,7 +241,7 @@ const handleKlineUpdate = async (data: any, topic: string) => {
     if (!config.tpOrderId) {
       // call API to cancel an order by orderId
       const cancelOrderResult = await contractClient.cancelOrder({
-        symbol: symbol,
+        symbol,
         orderId: config.orderId,
       });
       if (cancelOrderResult.retMsg !== "OK") {
@@ -257,7 +258,7 @@ const handleKlineUpdate = async (data: any, topic: string) => {
     } else {
       const getActiveOrdersResult = await contractClient.getActiveOrders({
         orderId: config.tpOrderId,
-        symbol: symbol,
+        symbol,
       });
       if (getActiveOrdersResult.retMsg !== "OK") {
         console.error(
@@ -286,17 +287,16 @@ const handleKlineUpdate = async (data: any, topic: string) => {
           newTpPrice = oldTpPrice + diff * reduce;
         }
 
-        let modifyOrderResult = await contractClient.modifyOrder({
-          symbol: symbol,
+        const modifyOrderResult = await contractClient.modifyOrder({
+          symbol,
           orderId: tpOrder.orderId,
-          price: newTpPrice.toFixed(4),
-          // triggerPrice: newTpPrice.toFixed(4),
+          price: formatNumber(newTpPrice),
         });
         if (modifyOrderResult.retMsg !== "OK") {
           console.error(
             `ERROR modify take profit: ${
               tpOrder.orderId
-            } from ${oldTpPrice.toFixed(4)} to ${newTpPrice.toFixed(4)}`,
+            } from ${formatNumber(oldTpPrice)} to ${formatNumber(newTpPrice)}, before rounding ${newTpPrice}`,
             JSON.stringify(modifyOrderResult, null, 2)
           );
         }
@@ -387,7 +387,7 @@ const handleContractAccountUpdate = async (data: any) => {
                   Sell price: ${
                     orderType === "Short" ? entryPrice : exitPrice
                   }, amount: ${orderType === "Long" ? entryAmount : exitAmount}
-                  PNL: $${pnl} ~ ${pnlPercentage.toFixed(4)}%
+                  PNL: $${pnl} ~ ${formatNumber(pnlPercentage)}%
                 `;
           notify(newMessage);
         }, 5000);
@@ -419,7 +419,6 @@ const handleContractAccountUpdate = async (data: any) => {
       // }
 
       let config = allConfigs.find(config => config.orderId === filledOrder.orderId)
-      console.log("🚀 ~ file: bot.ts:419 ~ handleContractAccountUpdate ~ filledOrder:", filledOrder)
       if (config) {
         const side = filledOrder.side === "Buy" ? "OpenLong" : "OpenShort";
         const message = `
@@ -442,8 +441,8 @@ const handleContractAccountUpdate = async (data: any) => {
         // call API to submit buy limit order of the config
         const submitOrderResult = await contractClient.submitOrder({
           side: tpOrderSide,
-          symbol: symbol,
-          price: tpPrice.toFixed(4),
+          symbol,
+          price: formatNumber(tpPrice),
           orderType: "Limit",
           qty: filledOrder.qty,
           timeInForce: "GoodTillCancel",
@@ -518,7 +517,7 @@ const handleContractAccountUpdate = async (data: any) => {
                   Sell price: ${
                     orderType === "Short" ? entryPrice : exitPrice
                   }, amount: ${orderType === "Long" ? entryAmount : exitAmount}
-                  PNL: $${pnl} ~ ${pnlPercentage.toFixed(4)}%
+                  PNL: $${pnl} ~ ${formatNumber(pnlPercentage)}%
                 `;
           notify(newMessage);
         }, 5000, config);
@@ -533,7 +532,7 @@ const handleContractAccountUpdate = async (data: any) => {
 };
 
 const notify = (message: string) => {
-  // telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
+  telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID || "", message);
 };
 
 const bot = async () => {
