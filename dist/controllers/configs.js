@@ -35,7 +35,18 @@ const createConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         const configs = (0, config_json_1.readConfigs)();
         const config = Object.assign(Object.assign({}, req.body), { _id: Date.now().toString() });
         const newConfigs = [...configs, config];
-        console.log("🚀 ~ file: configs.ts:24 ~ createConfig ~ config:", config);
+        const contractClient = new bybit_api_1.ContractClient({
+            key: process.env.API_KEY,
+            secret: process.env.API_SECRET,
+            testnet: Boolean(process.env.TEST_NET),
+        });
+        const setPositionModeResult = yield contractClient.setPositionMode({
+            symbol: config.symbol,
+            mode: 3,
+        });
+        if (setPositionModeResult.retCode !== 0) {
+            console.error(`ERROR set position mode`, JSON.stringify(setPositionModeResult, null, 2));
+        }
         (0, config_json_1.writeConfigs)(newConfigs);
         (0, bot_1.default)();
         res.status(200).json(config);

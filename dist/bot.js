@@ -42,7 +42,7 @@ const config_json_1 = require("./models/config-json");
 const helpers_1 = require("./helpers");
 dotenv.config();
 const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-const telegramBot = new node_telegram_bot_api_1.default(telegramApiToken, { polling: true });
+const telegramBot = new node_telegram_bot_api_1.default(telegramApiToken);
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
 const TEST_NET = Boolean(process.env.TEST_NET);

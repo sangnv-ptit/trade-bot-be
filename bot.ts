@@ -7,7 +7,7 @@ import { formatNumber } from "./helpers";
 
 dotenv.config();
 const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
-const telegramBot = new TelegramBot(telegramApiToken, { polling: true });
+const telegramBot = new TelegramBot(telegramApiToken);
 
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;

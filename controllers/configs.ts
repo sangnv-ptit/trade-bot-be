@@ -21,7 +21,21 @@ export const createConfig = async (req: any, res: any) => {
     const configs = readConfigs()
     const config = {...req.body, _id: Date.now().toString()}
     const newConfigs = [...configs, config]
-    console.log("🚀 ~ file: configs.ts:24 ~ createConfig ~ config:", config)
+    const contractClient = new ContractClient({
+      key: process.env.API_KEY,
+      secret: process.env.API_SECRET,
+      testnet: Boolean(process.env.TEST_NET),
+    });
+    const setPositionModeResult = await contractClient.setPositionMode({
+      symbol: config.symbol,
+      mode: 3,
+    });
+    if (setPositionModeResult.retCode !== 0) {
+        console.error(
+          `ERROR set position mode`,
+          JSON.stringify(setPositionModeResult, null, 2)
+        );
+      }
     writeConfigs(newConfigs)
     bot();
     res.status(200).json(config);
