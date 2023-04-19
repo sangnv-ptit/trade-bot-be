@@ -1,0 +1,32 @@
+[
+  {
+    "symbol": "IDUSDT",
+    "tradeType": "both",
+    "interval": "1",
+    "oc": 3.5,
+    "extend": 50,
+    "amount": 500,
+    "tp": "50",
+    "autoIncreaseOc": "20",
+    "reduceMode": "highLow",
+    "reduce": 20,
+    "_id": "1681625321676",
+    "orderId": "",
+    "tpOrderId": ""
+  },
+  {
+    "symbol": "IDUSDT",
+    "tradeType": "both",
+    "interval": "1",
+    "oc": 4,
+    "extend": 50,
+    "amount": 500,
+    "tp": "50",
+    "autoIncreaseOc": "20",
+    "reduceMode": "highLow",
+    "reduce": 20,
+    "_id": "1681625333181",
+    "orderId": "",
+    "tpOrderId": ""
+  }
+]
