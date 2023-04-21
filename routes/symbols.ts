@@ -16,7 +16,7 @@ router.get('/', async (req: Request, res: Response) => {
     const symbolsResult = await restClient.getSymbolTicker('linear')
     if (symbolsResult.retMsg !== 'OK') {
       console.error(
-        `ERROR get positions: `,
+        `ERROR get symbols: `,
         JSON.stringify(symbolsResult, null, 2),
       );
     }

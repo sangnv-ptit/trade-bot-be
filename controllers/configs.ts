@@ -1,7 +1,8 @@
 import Config from "../models/Config";
 import bot from "../bot";
-import { ContractClient } from "bybit-api";
+import { ContractClient, WebsocketClient } from "bybit-api";
 import { readConfigs, writeConfigs } from "../models/config-json";
+import fs from 'fs';
 
 export const getConfigs = async (req: any, res: any) => {
   try {
@@ -31,11 +32,11 @@ export const createConfig = async (req: any, res: any) => {
       mode: 3,
     });
     if (setPositionModeResult.retCode !== 0) {
-        console.error(
-          `ERROR set position mode`,
-          JSON.stringify(setPositionModeResult, null, 2)
-        );
-      }
+      console.error(
+        `ERROR set position mode`,
+        JSON.stringify(setPositionModeResult, null, 2)
+      );
+    }
     writeConfigs(newConfigs)
     bot();
     res.status(200).json(config);
@@ -55,7 +56,6 @@ export const deleteConfig = async (req: any, res: any) => {
       return;
     }
     const deletedConfig = configs.splice(indexToDelete, 1)[0]
-    console.log("🚀 ~ file: configs.ts:40 ~ deleteConfig ~ configs:", configs)
 
     if (!deletedConfig) return;
     if (deletedConfig.orderId && !deletedConfig.tpOrderId) {
@@ -90,3 +90,32 @@ export const deleteConfig = async (req: any, res: any) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+export const downloadConfigs = async (req: any, res: any) => {
+  try {
+    res.download("db.json")
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+}
+
+export const uploadConfigs = async (req: any, res: any) => {
+  const { path: filePath } = req.file;
+
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error(err);
+      res.status(500).send('Error uploading file');
+    } else {
+      try {
+        const configs = JSON.parse(data);
+        // Do something with the JSON data
+        res.status(200).json(configs);
+      } catch (err) {
+        console.error(err);
+        res.status(400).send('Invalid JSON file');
+      }
+    }
+  });
+}
+

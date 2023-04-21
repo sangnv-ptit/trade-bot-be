@@ -12,10 +12,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteConfig = exports.createConfig = exports.getConfigs = void 0;
+exports.uploadConfigs = exports.downloadConfigs = exports.deleteConfig = exports.createConfig = exports.getConfigs = void 0;
 const bot_1 = __importDefault(require("../bot"));
 const bybit_api_1 = require("bybit-api");
 const config_json_1 = require("../models/config-json");
+const fs_1 = __importDefault(require("fs"));
 const getConfigs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // const configs = await Config.find({});
@@ -67,7 +68,6 @@ const deleteConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return;
         }
         const deletedConfig = configs.splice(indexToDelete, 1)[0];
-        console.log("🚀 ~ file: configs.ts:40 ~ deleteConfig ~ configs:", configs);
         if (!deletedConfig)
             return;
         if (deletedConfig.orderId && !deletedConfig.tpOrderId) {
@@ -97,3 +97,33 @@ const deleteConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.deleteConfig = deleteConfig;
+const downloadConfigs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        res.download("db.json");
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+exports.downloadConfigs = downloadConfigs;
+const uploadConfigs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { path: filePath } = req.file;
+    fs_1.default.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+            console.error(err);
+            res.status(500).send('Error uploading file');
+        }
+        else {
+            try {
+                const configs = JSON.parse(data);
+                // Do something with the JSON data
+                res.status(200).json(configs);
+            }
+            catch (err) {
+                console.error(err);
+                res.status(400).send('Invalid JSON file');
+            }
+        }
+    });
+});
+exports.uploadConfigs = uploadConfigs;

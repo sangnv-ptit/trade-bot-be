@@ -25,7 +25,7 @@ router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         });
         const symbolsResult = yield restClient.getSymbolTicker('linear');
         if (symbolsResult.retMsg !== 'OK') {
-            console.error(`ERROR get positions: `, JSON.stringify(symbolsResult, null, 2));
+            console.error(`ERROR get symbols: `, JSON.stringify(symbolsResult, null, 2));
         }
         res.status(200).send(symbolsResult.result.list.map((symbol) => symbol.symbol));
     }

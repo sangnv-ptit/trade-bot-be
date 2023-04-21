@@ -19,7 +19,14 @@ const contractClient = new ContractClient({
   testnet: TEST_NET,
 });
 
-let allConfigs = readConfigs()
+const wsClient = new WebsocketClient({
+  key: API_KEY,
+  secret: API_SECRET,
+  market: "contractUSDT",
+  testnet: TEST_NET,
+});
+
+// let allConfigs = readConfigs();
 
 const symbolOpenPriceMap: any = {
   "1": {},
@@ -38,26 +45,13 @@ const isSumbitting: any = {};
 
 const configWebsocket = async () => {
   try {
-    allConfigs = readConfigs()
-    const wsClient = new WebsocketClient({
-      key: API_KEY,
-      secret: API_SECRET,
-      market: "contractUSDT",
-      testnet: TEST_NET,
+    let allConfigs = readConfigs();
+
+    const topics = wsClient.getWsStore().getTopics("contractUSDTPublic")
+    console.log("🚀 ~ file: bot.ts:51 ~ configWebsocket ~ topics:", topics)
+    wsClient.on("update", async (data) => {
+      await handleUpdate(allConfigs, data)
     });
-
-    // const setPositionModeResult = await contractClient.setPositionMode({
-    //   coin: "USDT",
-    //   mode: 3,
-    // });
-    // if (setPositionModeResult.retCode !== 0) {
-    //   console.error(
-    //     `ERROR set position mode`,
-    //     JSON.stringify(setPositionModeResult, null, 2)
-    //   );
-    // }
-
-    wsClient.on("update", handleUpdate);
 
     // wsClient.on("open", (data) => {
     //   console.log("ws connection opened:", data.wsKey);
@@ -90,28 +84,28 @@ const configWebsocket = async () => {
   }
 };
 
-const handleUpdate = async (data: any) => {
+const handleUpdate = async (allConfigs: any, data: any) => {
   try {
-    // allConfigs = readConfigs()
     if (data.topic.startsWith("tickers.")) {
-      handleTickerUpdate(data.data);
+      handleTickerUpdate(allConfigs, data.data);
     } else if (data.topic.startsWith("kline.")) {
-      handleKlineUpdate(data.data, data.topic);
+      handleKlineUpdate(allConfigs, data.data, data.topic);
     } else if (data.topic === `user.order.contractAccount`) {
-      handleContractAccountUpdate(data.data);
+      handleContractAccountUpdate(allConfigs, data.data);
     }
-    // writeConfigs(allConfigs);
+    writeConfigs(allConfigs)
   } catch (error) {
     console.error(`Unexpected error: `, error);
   }
 };
 
-const handleTickerUpdate = async (data: any) => {
+const handleTickerUpdate = async (allConfigs:any, data: any) => {
   const symbol = data.symbol;
   // const configs = await Config.find({ symbol: symbol });
-  const configs = allConfigs.filter(config => config.symbol === symbol)
+  const configs = allConfigs.filter((config:any) => config.symbol === symbol);
   if (configs.length == 0) {
     console.log(`no config for symbol: ${symbol}`);
+    wsClient.unsubscribe(`tickers.${symbol}`);
     return;
   }
 
@@ -119,24 +113,7 @@ const handleTickerUpdate = async (data: any) => {
   const lastPrice = data.lastPrice;
   if (!lastPrice) return;
 
-  // const contractClient = new ContractClient({
-  //   key: API_KEY,
-  //   secret: API_SECRET,
-  //   testnet: TEST_NET,
-  //   recv_window: 60000,
-  // });
-
-  // Call API to set TP mode to Partial for the symbol of the config
-  // const setTPSLModeResult = await contractClient.setTPSLMode(symbol, "Full"); // TODO: remove, default by Bybit
-  // if (setTPSLModeResult.retMsg !== "OK") {
-  //   console.error(
-  //     `ERROR set TP mode symbol: ${symbol}`,
-  //     JSON.stringify(setTPSLModeResult, null, 2)
-  //   );
-  //   return;
-  // }
-
-  configs.map(async (config) => {
+  configs.map(async (config:any) => {
     // Return if is submitting an order, to prevent Bybit send ticker too fast -> override config.orderId
     if (isSumbitting[config._id]) return;
 
@@ -182,7 +159,7 @@ const handleTickerUpdate = async (data: any) => {
         );
         config.orderId = submitOrderResult.result.orderId;
         // await config.save();
-        writeConfigs(allConfigs)
+        // writeConfigs(allConfigs);
       }
     } else if (lastPrice > sellConditionPrice && tradeType !== "short") {
       const limitPrice = openPrice + openPrice * oc;
@@ -207,14 +184,14 @@ const handleTickerUpdate = async (data: any) => {
       } else {
         config.orderId = submitOrderResult.result.orderId;
         // await config.save();
-        writeConfigs(allConfigs)
+        // writeConfigs(allConfigs);
       }
     }
     isSumbitting[config._id] = false;
   });
 };
 
-const handleKlineUpdate = async (data: any, topic: string) => {
+const handleKlineUpdate = async (allConfigs: any,data: any, topic: string) => {
   const closedTicker = data.find((ticker: any) => ticker.confirm);
   if (!closedTicker) return;
 
@@ -223,20 +200,18 @@ const handleKlineUpdate = async (data: any, topic: string) => {
   //   symbol: symbol,
   //   interval: interval,
   // });
-  const configs = allConfigs.filter(config => config.symbol === symbol && config.interval === interval)
-  if (configs.length == 0) {
+  const configs = allConfigs.filter(
+    (config:any) => config.symbol === symbol && config.interval === interval
+  );
+  if (configs.length === 0) {
     console.log(`no config for symbol: ${symbol}`);
+    wsClient.unsubscribe(`kline.${interval}.${symbol}`);
     return;
   }
   const openPrice = closedTicker.close;
   symbolOpenPriceMap[interval][symbol] = Number.parseFloat(openPrice);
 
-  configs.map(async (config) => {
-    // const contractClient = new ContractClient({
-    //   key: API_KEY,
-    //   secret: API_SECRET,
-    //   testnet: TEST_NET,
-    // });
+  configs.map(async (config:any) => {
     if (!config.orderId) return;
     if (!config.tpOrderId) {
       // call API to cancel an order by orderId
@@ -249,11 +224,8 @@ const handleKlineUpdate = async (data: any, topic: string) => {
           `ERROR cancel order: ${config.orderId}`,
           JSON.stringify(cancelOrderResult, null, 2)
         );
-        return;
       } else {
-        console.log(
-          `SUCCESS cancel order: ${config.orderId}`,
-        );
+        console.log(`SUCCESS cancel order: ${config.orderId}`);
       }
     } else {
       const getActiveOrdersResult = await contractClient.getActiveOrders({
@@ -267,6 +239,7 @@ const handleKlineUpdate = async (data: any, topic: string) => {
         );
       } else {
         const tpOrder = getActiveOrdersResult.result.list[0];
+        if (!tpOrder) return;
         const currentTime = new Date().getTime();
         const tpOrderCreatedTime = Number.parseInt(tpOrder.createdTime);
 
@@ -275,7 +248,6 @@ const handleKlineUpdate = async (data: any, topic: string) => {
           return;
         }
 
-        // const oldTpPrice = Number.parseFloat(tpOrder.triggerPrice);
         const oldTpPrice = Number.parseFloat(tpOrder.price);
         const diff = Math.abs(oldTpPrice - openPrice);
         const reduce = config.reduce / 100;
@@ -294,9 +266,9 @@ const handleKlineUpdate = async (data: any, topic: string) => {
         });
         if (modifyOrderResult.retMsg !== "OK") {
           console.error(
-            `ERROR modify take profit: ${
-              tpOrder.orderId
-            } from ${formatNumber(oldTpPrice)} to ${formatNumber(newTpPrice)}, before rounding ${newTpPrice}`,
+            `ERROR modify take profit: ${tpOrder.orderId} from ${formatNumber(
+              oldTpPrice
+            )} to ${formatNumber(newTpPrice)}, before rounding ${newTpPrice}`,
             JSON.stringify(modifyOrderResult, null, 2)
           );
         }
@@ -305,167 +277,95 @@ const handleKlineUpdate = async (data: any, topic: string) => {
   });
 };
 
-const handleContractAccountUpdate = async (data: any) => {
-  const cancelledOrder = data.find((item: any) => {
-    return item.orderStatus === "Cancelled";
-  });
+const handleContractAccountUpdate = async (allConfigs:any,data: any) => {
+  const cancelledOrder = data.find((item: any) => item.orderStatus === "Cancelled");
   if (cancelledOrder) {
     // const config = await Config.findOne({
     //   orderId: cancelledOrder.orderId,
     // });
-    const config = allConfigs.find(config => config.orderId === cancelledOrder.orderId)
+    const config = allConfigs.find(
+      (config:any) => config.orderId === cancelledOrder.orderId
+    );
     if (config) {
       config.orderId = "";
       config.tpOrderId = "";
       // await config.save();
-      writeConfigs(allConfigs)
+      // writeConfigs(allConfigs);
     }
   }
 
-  const filledOrder = data.find((item: any) => {
-    return (
-      item.orderStatus === "Filled"// || item.orderStatus === "PartiallyFilled"
-    );
-  });
+  const filledOrder = data.find((item: any) => item.orderStatus === "Filled");
   if (filledOrder) {
-    // when take profit order filled, order type can only be market -> no partially filled
-    if (filledOrder.stopOrderType === "PartialTakeProfit") {
-      return
-      // const config = await Config.findOne({
-      //   tpOrderId: filledOrder.orderId,
-      // });
-      const config = allConfigs[0]
+    // const tpOrder = data[1];
+    // const config = await Config.findOne({ orderId: filledOrder.orderId });
 
-      if (config) {
-        const orderType = filledOrder.side === "Buy" ? "Short" : "Long";
-        const message = `
-          ${filledOrder.symbol} | Close${orderType}
-          Bot:...
-          Futures | Min${config.interval} | OC: ${config.oc}% | TP: ${config.tp}%
-          Status: Completed
-          Price: ${filledOrder.lastExecPrice}, amount: ${filledOrder.cumExecValue}
-        `;
-        notify(message);
+    // if (config) {
+    //   const side = filledOrder.side === "Buy" ? "OpenLong" : "OpenShort";
+    //   const message = `
+    //     ${filledOrder.symbol} | ${side}
+    //     Bot:...
+    //     Futures | Min${config.interval} | OC: ${config.oc}% | TP: ${
+    //     config.tp
+    //   }%
+    //     Status: ${filledOrder.leavesQty !== "0" ? "Incompleted" : "Completed"}
+    //     Price: ${filledOrder.avgPrice}, amount: ${filledOrder.cumExecValue}
+    //   `;
+    //   notify(message);
+    //   config.tpOrderId = tpOrder.orderId;
+    //   await config.save();
+    // }
 
-        setTimeout(async () => {
-          const contractClient = new ContractClient({
-            key: API_KEY,
-            secret: API_SECRET,
-            testnet: TEST_NET,
-          });
-
-          const getClosedProfitAndLossResult =
-            await contractClient.getClosedProfitAndLoss({
-              symbol: config.symbol,
-              limit: 1,
-            });
-          const pnl = Number.parseFloat(
-            getClosedProfitAndLossResult.result.list[0].closedPnl
-          );
-          const pnlPercentage = (pnl / config.amount) * 100;
-          const entryPrice =
-            getClosedProfitAndLossResult.result.list[0].avgEntryPrice;
-          const exitPrice =
-            getClosedProfitAndLossResult.result.list[0].avgExitPrice;
-          const entryAmount = getClosedProfitAndLossResult.result.list[0].qty;
-          const exitAmount =
-            getClosedProfitAndLossResult.result.list[0].closedSize;
-          if (pnl > 0) {
-            config.winCount += 1;
-          } else {
-            config.loseCount += 1;
-          }
-          const newMessage = `
-                  ${filledOrder.symbol} - ${orderType} | ${
-            pnl > 0 ? "WIN" : "LOSE"
-          }
-                  Bot:...
-                  ${config.winCount} WINS, ${config.loseCount} LOSES
-                  Buy price: ${
-                    orderType === "Long" ? entryPrice : exitPrice
-                  }, amount: ${orderType === "Long" ? entryAmount : exitAmount}
-                  Sell price: ${
-                    orderType === "Short" ? entryPrice : exitPrice
-                  }, amount: ${orderType === "Long" ? entryAmount : exitAmount}
-                  PNL: $${pnl} ~ ${formatNumber(pnlPercentage)}%
-                `;
-          notify(newMessage);
-        }, 5000);
-
-        config.orderId = "";
-        config.tpOrderId = "";
-        // await config.save();
-      }
-    }
-    // when limit order filled, can be partially filled
-    else {
-      // const tpOrder = data[1];
-      // const config = await Config.findOne({ orderId: filledOrder.orderId });
-
-      // if (config) {
-      //   const side = filledOrder.side === "Buy" ? "OpenLong" : "OpenShort";
-      //   const message = `
-      //     ${filledOrder.symbol} | ${side}
-      //     Bot:...
-      //     Futures | Min${config.interval} | OC: ${config.oc}% | TP: ${
-      //     config.tp
-      //   }%
-      //     Status: ${filledOrder.leavesQty !== "0" ? "Incompleted" : "Completed"}
-      //     Price: ${filledOrder.avgPrice}, amount: ${filledOrder.cumExecValue}
-      //   `;
-      //   notify(message);
-      //   config.tpOrderId = tpOrder.orderId;
-      //   await config.save();
-      // }
-
-      let config = allConfigs.find(config => config.orderId === filledOrder.orderId)
-      if (config) {
-        const side = filledOrder.side === "Buy" ? "OpenLong" : "OpenShort";
-        const message = `
+    let config = allConfigs.find(
+      (config:any) => config.orderId === filledOrder.orderId
+    );
+    if (config) {
+      const side = filledOrder.side === "Buy" ? "OpenLong" : "OpenShort";
+      const message = `
           ${filledOrder.symbol} | ${side}
           Bot:...
           Futures | Min${config.interval} | OC: ${config.oc}% | TP: ${
-          config.tp
-        }%
+        config.tp
+      }%
           Status: ${filledOrder.leavesQty !== "0" ? "Incompleted" : "Completed"}
           Price: ${filledOrder.avgPrice}, amount: ${filledOrder.cumExecValue}
         `;
-        notify(message);
+      notify(message);
 
-        const tpOrderSide = filledOrder.side === "Buy" ? "Sell" : "Buy";
-        const tp = config.tp / 100
-        const symbol = config.symbol
-        const openPrice = symbolOpenPriceMap[config.interval][symbol];
-        const limitPrice = parseFloat(filledOrder.avgPrice)
-        const tpPrice = limitPrice + (openPrice - limitPrice) * tp;
-        // call API to submit buy limit order of the config
-        const submitOrderResult = await contractClient.submitOrder({
-          side: tpOrderSide,
-          symbol,
-          price: formatNumber(tpPrice),
-          orderType: "Limit",
-          qty: filledOrder.qty,
-          timeInForce: "GoodTillCancel",
-          positionIdx: filledOrder.positionIdx,
-        });
-        if (submitOrderResult.retMsg !== "OK") {
-          console.error(
-            `ERROR making take profit order: `,
-            JSON.stringify(submitOrderResult, null, 2),
-            tpPrice
-          );
-        } else {
-          console.log(
-            `SUCCESS making take profit order: `,
-            JSON.stringify(submitOrderResult, null, 2)
-          );
-          config.tpOrderId = submitOrderResult.result.orderId;
-          // await config.save();
-          writeConfigs(allConfigs)
-        }
+      const tpOrderSide = filledOrder.side === "Buy" ? "Sell" : "Buy";
+      const tp = config.tp / 100;
+      const symbol = config.symbol;
+      const openPrice = symbolOpenPriceMap[config.interval][symbol];
+      const limitPrice = parseFloat(filledOrder.avgPrice);
+      const tpPrice = limitPrice + (openPrice - limitPrice) * tp;
+      // call API to submit buy limit order of the config
+      const submitOrderResult = await contractClient.submitOrder({
+        side: tpOrderSide,
+        symbol,
+        price: formatNumber(tpPrice),
+        orderType: "Limit",
+        qty: filledOrder.qty,
+        timeInForce: "GoodTillCancel",
+        positionIdx: filledOrder.positionIdx,
+      });
+      if (submitOrderResult.retMsg !== "OK") {
+        console.error(
+          `ERROR making take profit order: `,
+          JSON.stringify(submitOrderResult, null, 2),
+          tpPrice
+        );
+      } else {
+        console.log(
+          `SUCCESS making take profit order: `,
+          JSON.stringify(submitOrderResult, null, 2)
+        );
+        config.tpOrderId = submitOrderResult.result.orderId;
+        // await config.save();
+        // writeConfigs(allConfigs);
       }
 
-      config = allConfigs.find(config => config.tpOrderId === filledOrder.orderId)
+      config = allConfigs.find(
+        (config:any) => config.tpOrderId === filledOrder.orderId
+      );
       if (config) {
         const orderType = filledOrder.side === "Buy" ? "Short" : "Long";
         const message = `
@@ -477,38 +377,39 @@ const handleContractAccountUpdate = async (data: any) => {
         `;
         notify(message);
 
-        setTimeout(async (config) => {
-          const contractClient = new ContractClient({
-            key: API_KEY,
-            secret: API_SECRET,
-            testnet: TEST_NET,
-          });
-
-          const getClosedProfitAndLossResult =
-            await contractClient.getClosedProfitAndLoss({
-              symbol: config.symbol,
-              limit: 1,
+        setTimeout(
+          async (config) => {
+            const contractClient = new ContractClient({
+              key: API_KEY,
+              secret: API_SECRET,
+              testnet: TEST_NET,
             });
-          const pnl = Number.parseFloat(
-            getClosedProfitAndLossResult.result.list[0].closedPnl
-          );
-          const pnlPercentage = (pnl / config.amount) * 100;
-          const entryPrice =
-            getClosedProfitAndLossResult.result.list[0].avgEntryPrice;
-          const exitPrice =
-            getClosedProfitAndLossResult.result.list[0].avgExitPrice;
-          const entryAmount = getClosedProfitAndLossResult.result.list[0].qty;
-          const exitAmount =
-            getClosedProfitAndLossResult.result.list[0].closedSize;
-          if (pnl > 0) {
-            config.winCount += 1;
-          } else {
-            config.loseCount += 1;
-          }
-          const newMessage = `
+
+            const getClosedProfitAndLossResult =
+              await contractClient.getClosedProfitAndLoss({
+                symbol: config.symbol,
+                limit: 1,
+              });
+            const pnl = Number.parseFloat(
+              getClosedProfitAndLossResult.result.list[0].closedPnl
+            );
+            const pnlPercentage = (pnl / config.amount) * 100;
+            const entryPrice =
+              getClosedProfitAndLossResult.result.list[0].avgEntryPrice;
+            const exitPrice =
+              getClosedProfitAndLossResult.result.list[0].avgExitPrice;
+            const entryAmount = getClosedProfitAndLossResult.result.list[0].qty;
+            const exitAmount =
+              getClosedProfitAndLossResult.result.list[0].closedSize;
+            if (pnl > 0) {
+              config.winCount += 1;
+            } else {
+              config.loseCount += 1;
+            }
+            const newMessage = `
                   ${filledOrder.symbol} - ${orderType} | ${
-            pnl > 0 ? "WIN" : "LOSE"
-          }
+              pnl > 0 ? "WIN" : "LOSE"
+            }
                   Bot:...
                   ${config.winCount} WINS, ${config.loseCount} LOSES
                   Buy price: ${
@@ -519,13 +420,16 @@ const handleContractAccountUpdate = async (data: any) => {
                   }, amount: ${orderType === "Long" ? entryAmount : exitAmount}
                   PNL: $${pnl} ~ ${formatNumber(pnlPercentage)}%
                 `;
-          notify(newMessage);
-        }, 5000, config);
+            notify(newMessage);
+          },
+          5000,
+          config
+        );
 
         config.orderId = "";
         config.tpOrderId = "";
         // await config.save();
-        writeConfigs(allConfigs);
+        // writeConfigs(allConfigs);
       }
     }
   }
@@ -536,7 +440,7 @@ const notify = (message: string) => {
 };
 
 const bot = async () => {
-  configWebsocket();
+  await configWebsocket();
 };
 
 export default bot;
