@@ -45,13 +45,11 @@ const isSumbitting: any = {};
 
 const configWebsocket = async () => {
   try {
-    let allConfigs = readConfigs();
+    const allConfigs = readConfigs();
 
-    const topics = wsClient.getWsStore().getTopics("contractUSDTPublic")
-    console.log("🚀 ~ file: bot.ts:51 ~ configWebsocket ~ topics:", topics)
-    wsClient.on("update", async (data) => {
-      await handleUpdate(allConfigs, data)
-    });
+    // const topics = wsClient.getWsStore().getTopics("contractUSDTPublic")
+    // console.log("🚀 ~ file: bot.ts:51 ~ configWebsocket ~ topics:", topics)
+    wsClient.on("update", handleUpdate);
 
     // wsClient.on("open", (data) => {
     //   console.log("ws connection opened:", data.wsKey);
@@ -84,8 +82,9 @@ const configWebsocket = async () => {
   }
 };
 
-const handleUpdate = async (allConfigs: any, data: any) => {
+const handleUpdate = async (data: any) => {
   try {
+    const allConfigs = readConfigs()
     if (data.topic.startsWith("tickers.")) {
       handleTickerUpdate(allConfigs, data.data);
     } else if (data.topic.startsWith("kline.")) {

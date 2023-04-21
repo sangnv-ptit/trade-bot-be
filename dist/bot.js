@@ -74,12 +74,10 @@ const symbolOpenPriceMap = {
 const isSumbitting = {};
 const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let allConfigs = (0, config_json_1.readConfigs)();
-        const topics = wsClient.getWsStore().getTopics("contractUSDTPublic");
-        console.log("🚀 ~ file: bot.ts:51 ~ configWebsocket ~ topics:", topics);
-        wsClient.on("update", (data) => __awaiter(void 0, void 0, void 0, function* () {
-            yield handleUpdate(allConfigs, data);
-        }));
+        const allConfigs = (0, config_json_1.readConfigs)();
+        // const topics = wsClient.getWsStore().getTopics("contractUSDTPublic")
+        // console.log("🚀 ~ file: bot.ts:51 ~ configWebsocket ~ topics:", topics)
+        wsClient.on("update", handleUpdate);
         // wsClient.on("open", (data) => {
         //   console.log("ws connection opened:", data.wsKey);
         // });
@@ -110,8 +108,9 @@ const configWebsocket = () => __awaiter(void 0, void 0, void 0, function* () {
         console.error(`Unexpected error: `, error);
     }
 });
-const handleUpdate = (allConfigs, data) => __awaiter(void 0, void 0, void 0, function* () {
+const handleUpdate = (data) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const allConfigs = (0, config_json_1.readConfigs)();
         if (data.topic.startsWith("tickers.")) {
             handleTickerUpdate(allConfigs, data.data);
         }
