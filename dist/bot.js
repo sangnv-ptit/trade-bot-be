@@ -131,7 +131,7 @@ const handleTickerUpdate = (allConfigs, data) => __awaiter(void 0, void 0, void 
     // const configs = await Config.find({ symbol: symbol });
     const configs = allConfigs.filter((config) => config.symbol === symbol);
     if (configs.length == 0) {
-        console.log(`no config for symbol: ${symbol}`);
+        console.log(`[ticker] no config for symbol: ${symbol}`);
         wsClient.unsubscribe(`tickers.${symbol}`);
         return;
     }
@@ -218,7 +218,7 @@ const handleKlineUpdate = (allConfigs, data, topic) => __awaiter(void 0, void 0,
     // });
     const configs = allConfigs.filter((config) => config.symbol === symbol && config.interval === interval);
     if (configs.length === 0) {
-        console.log(`no config for symbol: ${symbol}`);
+        console.log(`[kline] no config for symbol: ${symbol}`);
         wsClient.unsubscribe(`kline.${interval}.${symbol}`);
         return;
     }

@@ -103,7 +103,7 @@ const handleTickerUpdate = async (allConfigs:any, data: any) => {
   // const configs = await Config.find({ symbol: symbol });
   const configs = allConfigs.filter((config:any) => config.symbol === symbol);
   if (configs.length == 0) {
-    console.log(`no config for symbol: ${symbol}`);
+    console.log(`[ticker] no config for symbol: ${symbol}`);
     wsClient.unsubscribe(`tickers.${symbol}`);
     return;
   }
@@ -203,7 +203,7 @@ const handleKlineUpdate = async (allConfigs: any,data: any, topic: string) => {
     (config:any) => config.symbol === symbol && config.interval === interval
   );
   if (configs.length === 0) {
-    console.log(`no config for symbol: ${symbol}`);
+    console.log(`[kline] no config for symbol: ${symbol}`);
     wsClient.unsubscribe(`kline.${interval}.${symbol}`);
     return;
   }
