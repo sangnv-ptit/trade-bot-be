@@ -11,6 +11,7 @@ import { WebsocketClient, ContractClient } from "bybit-api";
 import { readConfigs, writeConfigs } from "./models/config-json";
 import { formatNumber } from "./helpers";
 import multer, { FileFilterCallback } from "multer";
+import TelegramBot from "node-telegram-bot-api";
 
 dotenv.config();
 const app: Express = express();
@@ -18,6 +19,7 @@ const app: Express = express();
 app.use(express.json());
 app.use(cors());
 
+// File storage config
 const storage = multer.diskStorage({
   destination: (req: Request, file: Express.Multer.File, cb: Function) => {
     cb(null, "./")
@@ -36,6 +38,16 @@ const upload = multer({
     cb(null, true);
   }
 })
+
+// Telegram notification
+const telegramApiToken = process.env.TELEGRAM_API_TOKEN || "";
+const telegramBot = new TelegramBot(telegramApiToken);
+
+const notify = (message: string) => {
+  if (process.env.TELEGRAM_CHAT_ID) {
+    telegramBot.sendMessage(process.env.TELEGRAM_CHAT_ID, message)
+  }
+}
 
 /* ROUTES */
 // app.use("/symbols", symbolRoutes);
@@ -278,6 +290,14 @@ wsClient.on("update", async (message) => {
         (config: any) => config.orderId === filledOrder.orderId
       );
       if (config) {
+        const message = `
+          ${filledOrder.symbol} | ${filledOrder.side === 'Buy' ? 'Open Long' : 'Open Short'}
+          Futures | Min${config.interval} | OC: ${config.oc}% | TP: ${config.tp}%
+          Status: ${filledOrder.leavesQty !== "0" ? "Incompleted" : "Completed"}
+          Price: ${filledOrder.avgPrice}, amount: ${filledOrder.cumExecValue}
+        `
+        notify(message)
+
         const tpOrderSide = filledOrder.side === "Buy" ? "Sell" : "Buy";
         const tp = config.tp / 100;
         const symbol = config.symbol;
@@ -314,9 +334,49 @@ wsClient.on("update", async (message) => {
         (config: any) => config.tpOrderId === filledOrder.orderId
       );
       if (tpConfig) {
+        const orderType = filledOrder.side === "Buy" ? "Short" : "Long";
+        const message = `
+          ${filledOrder.symbol} | Close ${orderType}
+          Futures | Min${tpConfig.interval} | OC: ${tpConfig.oc}% | TP: ${tpConfig.tp}%
+          Status: ${filledOrder.leavesQty !== "0" ? "Incompleted" : "Completed"}
+          Price: ${filledOrder.lastExecPrice}, amount: ${filledOrder.cumExecValue}
+        `;
+        notify(message);
         tpConfig.orderId = "";
         tpConfig.tpOrderId = "";
         writeConfigs(configs)
+
+        setTimeout(async (config: any) => {
+          const getClosedProfitAndLossResult = await contractClient.getClosedProfitAndLoss({
+            symbol: config.symbol,
+            limit: 1,
+          });
+          const pnl = Number.parseFloat(getClosedProfitAndLossResult.result.list[0].closedPnl);
+          const pnlPercentage = (pnl / config.amount) * 100;
+          const entryPrice =
+            getClosedProfitAndLossResult.result.list[0].avgEntryPrice;
+          const exitPrice =
+            getClosedProfitAndLossResult.result.list[0].avgExitPrice;
+          const entryAmount = getClosedProfitAndLossResult.result.list[0].qty;
+          const exitAmount =
+            getClosedProfitAndLossResult.result.list[0].closedSize;
+          if (pnl > 0) {
+            config.winCount += 1;
+          } else {
+            config.loseCount += 1;
+          }
+          const message = `
+            ${filledOrder.symbol} - ${orderType} | ${pnl > 0 ? 'WIN' : 'LOSE'}
+            ${config.winCount} WINS, ${config.loseCount} LOSES
+            Buy price: ${
+              orderType === "Long" ? entryPrice : exitPrice
+            }, amount: ${orderType === "Long" ? entryAmount : exitAmount}
+            Sell price: ${
+              orderType === "Short" ? entryPrice : exitPrice
+            }, amount: ${orderType === "Long" ? entryAmount : exitAmount}
+            PNL: $${pnl} ~ ${formatNumber(pnlPercentage)}%
+          `
+        }, 5000, tpConfig)
       }
     }
   }
@@ -329,6 +389,8 @@ readConfigs().forEach((config: any) => {
     `tickers.${config.symbol}`,
   ]);
 });
+
+// Routes
 
 app.get("/symbols", async (req: Request, res: Response) => {
   const symbolResult = await contractClient.getSymbolTicker("linear");
@@ -344,7 +406,7 @@ app.get("/configs", async (req: Request, res: Response) => {
 });
 
 app.post("/configs", async (req: Request, res: Response) => {
-  const config = { _id: Date.now().toString(), ...req.body };
+  const config = { _id: Date.now().toString(), winCount: 0, loseCount: 0, ...req.body };
   await contractClient.setPositionMode({
     symbol: config.symbol,
     mode: 3,
